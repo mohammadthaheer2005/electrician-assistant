@@ -54,54 +54,7 @@ if mode == "💬 Voice & Chat (గళం)":
     st.header("Multilingual Alexa-Style Assistant")
     st.info("Instant Voice Recognition: Tap the mic and start talking! No server delay.")
     
-    # -- BROWSER NATIVE STT COMPONENT --
-    st.components.v1.html(f"""
-        <div style="display: flex; justify-content: center; margin-bottom: 20px;">
-            <button id="stt-btn" style="
-                background: linear-gradient(135deg, #2563EB, #1E40AF);
-                color: white; border: none; padding: 15px 40px; 
-                border-radius: 50px; font-weight: bold; cursor: pointer;
-                box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
-                display: flex; align-items: center; gap: 12px; font-family: 'Inter', sans-serif;
-                font-size: 16px; transition: all 0.2s ease;
-            ">
-                <span id="mic-icon">🎙️</span>
-                <span id="btn-text">Tap to Speak</span>
-            </button>
-        </div>
-        <script>
-            const btn = document.getElementById('stt-btn');
-            const icon = document.getElementById('mic-icon');
-            const text = document.getElementById('btn-text');
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-            if (!SpeechRecognition) {{
-                text.innerText = "Error: Browser not supported";
-                btn.style.opacity = "0.5";
-            }} else {{
-                const recognition = new SpeechRecognition();
-                recognition.lang = '{stt_code}';
-                recognition.onstart = () => {{
-                    text.innerText = "Listening...";
-                    icon.innerText = "🛑";
-                    btn.style.background = "linear-gradient(135deg, #EF4444, #B91C1C)";
-                }};
-                recognition.onresult = (e) => {{
-                    const val = e.results[0][0].transcript;
-                    window.parent.postMessage({{
-                        type: 'streamlit:set_widget_value',
-                        data: {{ id: 'chat_input_voice', value: val }}
-                    }}, '*');
-                }};
-                recognition.onend = () => {{
-                    text.innerText = "Tap to Speak";
-                    icon.innerText = "🎙️";
-                    btn.style.background = "linear-gradient(135deg, #2563EB, #1E40AF)";
-                }};
-                btn.onclick = () => recognition.start();
-            }}
-        </script>
-    """, height=100)
+    st.info("🎙️ Unified AI Voice Control: Tap the mic below to speak in your language.")
 
     # Use a hidden text input to catch the voice result
     voice_transcript = st.text_input("Voice Catch", key="chat_input_voice", label_visibility="collapsed")
@@ -115,22 +68,13 @@ if mode == "💬 Voice & Chat (గళం)":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        c1, c2, c3 = st.columns([4, 1, 1])
-        with c1: prompt_text = st.chat_input("Type or use Mic...")
-        with c2:
-            if st.button("🎤 Local", key="chat_mic_local", help="Fast local mic (requires PyAudio)"):
-                with st.spinner("Listening..."):
-                    q = voice_utils.listen_local_mic(lang_code=stt_code)
-                    if not q.startswith("Error"):
-                        st.session_state.messages.append({"role": "user", "content": q})
-                        st.session_state.voice_trigger = q
-                        st.rerun()
-                    else: st.error(q)
-        with c3:
-            # Native Streamlit Audio Input for Cloud users
-            cloud_audio = st.audio_input("Cloud Mic", key="chat_mic_cloud", label_visibility="collapsed")
+        col_input, col_mic = st.columns([5, 1])
+        with col_input: 
+            prompt_text = st.chat_input("Type or say something...")
+        with col_mic:
+            # Single unified Cloud Mic for all environments
+            cloud_audio = st.audio_input("Mic", label_visibility="collapsed")
             if cloud_audio:
-                # IMPORTANT: Only process if it's a NEW recording
                 audio_id = hash(cloud_audio.getvalue())
                 if st.session_state.get("last_processed_audio") != audio_id:
                     with st.spinner("Transcribing..."):
@@ -143,27 +87,25 @@ if mode == "💬 Voice & Chat (గళం)":
                         elif q.startswith("Error"):
                             st.error(q)
     
-    # Logic: If we have voice_trigger or prompt_text, process it.
-    user_text = prompt_text if prompt_text else st.session_state.get("voice_trigger")
+    # Logic: If we have voice_trigger/prompt/browser-STT, process it.
+    final_input = prompt_text if prompt_text else (st.session_state.get("voice_trigger") if st.session_state.get("voice_trigger") else voice_transcript)
 
-    if user_text:
-        # Clear the voice trigger to avoid loops
-        if "voice_trigger" in st.session_state:
-            del st.session_state["voice_trigger"]
+    if final_input:
+        # Clear triggers to avoid loops
+        if "voice_trigger" in st.session_state: del st.session_state["voice_trigger"]
+        if "chat_input_voice" in st.session_state: st.session_state["chat_input_voice"] = ""
         
-        if prompt_text: # If it was from chat_input, append it (voice was already appended)
-            st.session_state.messages.append({"role": "user", "content": user_text})
+        if prompt_text: # If it was from chat_input, append it
+            st.session_state.messages.append({"role": "user", "content": final_input})
             
         with chat_col:
-            # We don't need to manually write user message here, st.rerun will handle it via state
             with st.chat_message("assistant"):
-                with st.spinner("Thinking..."):
+                with st.spinner(f"Processing in {lang_choice}..."):
                     chat_history = st.session_state.messages[-8:]
                     response = ai_engine.chat_with_electrician(chat_history, target_language=lang_choice)
                     st.markdown(response)
                     js_audio = voice_utils.text_to_speech(response, lang=tts_code)
-                    if js_audio:
-                        st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
+                    if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
             st.session_state.messages.append({"role": "assistant", "content": response})
             st.rerun()
 
@@ -201,41 +143,30 @@ elif mode == "📹 Live Video / Scanner":
         st.session_state.last_vision_img = active_img
         
         # 2) User Asks Question Dashboard 🎤
-        v_col_mic, v_col_input = st.columns([2, 3])
+        v_col_mic, v_col_input = st.columns([1, 2])
         
         with v_col_mic:
-            st.write("🎙️ VOICE INPUT")
-            vm_c1, vm_c2 = st.columns(2)
-            with vm_c1:
-                if st.button("🔌 Local", key="vision_mic_local", use_container_width=True, help="Requires PyAudio"):
-                    with st.spinner("Listening..."):
-                        q = voice_utils.listen_local_mic(lang_code=stt_code)
-                        if not q.startswith("Error"):
+            st.write("🎙️ SPEAK TO AI")
+            v_cloud_audio = st.audio_input("Voice Query", key="vision_mic_cloud", label_visibility="collapsed")
+            if v_cloud_audio:
+                v_audio_id = hash(v_cloud_audio.getvalue())
+                if st.session_state.get("last_vision_audio") != v_audio_id:
+                    with st.spinner("Transcribing..."):
+                        q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
+                        if not q.startswith("Error") and len(q.strip()) > 1:
                             st.session_state.v_q_input = q
+                            st.session_state.last_vision_audio = v_audio_id
                             st.rerun()
-                        else: st.error(q)
-            with vm_c2:
-                v_cloud_audio = st.audio_input("Cloud", key="vision_mic_cloud", label_visibility="collapsed")
-                if v_cloud_audio:
-                    # Loop prevention
-                    v_audio_id = hash(v_cloud_audio.getvalue())
-                    if st.session_state.get("last_vision_audio") != v_audio_id:
-                        with st.spinner("Transcribing..."):
-                            q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
-                            # Noise filter: skip if just background 'so' or too short
-                            if not q.startswith("Error") and len(q.strip()) > 1 and q.lower().strip() not in ["so.", "so", "hmm.", "hmm"]:
-                                st.session_state.v_q_input = q
-                                st.session_state.last_vision_audio = v_audio_id
-                                st.rerun()
-                            elif q.startswith("Error"):
-                                st.error(q)
+                        elif q.startswith("Error"):
+                            st.error(q)
         
         with v_col_input:
-            manual_q = st.text_input("Technical Query", key="v_q_input", placeholder="e.g. Check for wire damage")
+            manual_q = st.text_input("Technical Query", key="v_q_input", placeholder=f"Ask in {lang_choice}...")
             if st.button("🔍 START AI ANALYSIS", type="primary", use_container_width=True):
-                with st.spinner("Running Advanced Diagnostics..."):
+                with st.spinner(f"Analyzing in {lang_choice}..."):
                     b64 = base64.b64encode(active_img.getvalue()).decode('utf-8')
-                    final_q = manual_q if manual_q else "Analyze this electrical component for any visible faults or safety risks."
+                    # Force language instructions in the prompt too
+                    final_q = (manual_q if manual_q else "Analyze this component.") + f" Respond entirely in {lang_choice}."
                     resp = ai_engine.analyze_image(b64, final_q)
                     st.session_state.v_resp = resp
                     st.session_state.v_q_final = final_q
