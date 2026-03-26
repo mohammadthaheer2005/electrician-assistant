@@ -73,12 +73,16 @@ if mode == "💬 Voice & Chat (గళం)":
     user_text = ""
     
     if audio_bytes:
-        with st.spinner("Processing Voice..."):
-            recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
-            if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
-                user_text = recognized_text
-            else:
-                st.error("Audio not clearly recognized. Please try again.")
+        # Check if the audio is just a 0.5s click (often under 20KB for this bitrate)
+        if len(audio_bytes) < 30000:
+            st.warning("⚠️ Recording too short. Please tap the mic, speak clearly, and tap again to stop.")
+        else:
+            with st.spinner("Processing Voice..."):
+                recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
+                if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
+                    user_text = recognized_text
+                else:
+                    st.error("Audio not clearly recognized. Please try again or check your microphone.")
 
     if prompt_text:
         user_text = prompt_text

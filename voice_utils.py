@@ -6,35 +6,41 @@ import speech_recognition as sr
 
 def text_to_speech(text: str, lang: str = 'en') -> str:
     """
-    Returns JS code to instantly speak the text using the browser's super natural neural OS voices (Alexa/Siri quality).
+    Converts text to speech using gTTS for guaranteed multilingual support on all browsers.
     """
-    # Clean text of markdown asterisks and hash marks to avoid spelling them out
-    clean_text = text.replace("*", "").replace("#", "").replace('"', "'").replace("\n", " ")
-    
-    js_code = f"""
-    <script>
-        const msg = new SpeechSynthesisUtterance("{clean_text}");
-        msg.lang = "{lang}";
+    from gtts import gTTS
+    import io
+    import base64
+    try:
+        # gTTS uses 2-letter codes most of the time (en, te, hi, ml, ta)
+        g_lang = lang.split('-')[0]
         
-        // Try to find a premium local Google/Microsoft voice if available
-        let voices = window.speechSynthesis.getVoices();
-        let selectedVoice = voices.find(v => v.lang.includes("{lang}") && (v.name.includes("Google") || v.name.includes("Microsoft") || v.name.includes("Natural")));
-        if (selectedVoice) {{
-            msg.voice = selectedVoice;
-        }}
+        # Clean text of markdown
+        clean_text = text.replace("*", "").replace("#", "")
         
-        // Slight tweak for natural pacing
-        msg.rate = 1.0; 
-        msg.pitch = 1.0;
+        tts = gTTS(text=clean_text, lang=g_lang, slow=False)
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
         
-        window.speechSynthesis.speak(msg);
-    </script>
-    """
-    return js_code
+        # Base64 encode
+        audio_bytes = fp.read()
+        b64 = base64.b64encode(audio_bytes).decode()
+        return b64
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        return None
 
 def get_audio_html(b64_audio: str) -> str:
-    # b64_audio is now just the JS snippet
-    return b64_audio
+    """Returns HTML for auto-playing audio."""
+    if not b64_audio:
+        return ""
+    md = f"""
+        <audio autoplay class="stAudio">
+        <source src="data:audio/mp3;base64,{b64_audio}" type="audio/mp3">
+        </audio>
+        """
+    return md
 
 def process_audio_bytes(audio_bytes: bytes, lang_code: str = 'en-US') -> str:
     """
