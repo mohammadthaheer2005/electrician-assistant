@@ -19,13 +19,17 @@ You are the **ElectroAssist AI**, a master electrician from the local shop. Your
 - **Language:** If they speak to you in Hindi, Telugu, Tamil, or English, reply naturally in that exact same language using colloquial terms. Keep it short so it operates smoothly as a voice assistant.
 """
 
-def get_groq_client():
+def get_groq_client(groq_key=None):
     import streamlit as st
-    api_key = None
-    try:
-        # Check Streamlit Cloud Secrets first
-        api_key = st.secrets["GROQ_API_KEY"]
-    except Exception:
+    api_key = groq_key
+    if not api_key:
+        try:
+            # Check Streamlit Cloud Secrets first
+            api_key = st.secrets.get("GROQ_API_KEY")
+        except Exception:
+            pass
+            
+    if not api_key:
         # Fallback to local .env
         api_key = os.getenv("GROQ_API_KEY")
         
@@ -33,13 +37,13 @@ def get_groq_client():
         return None
     return Groq(api_key=api_key)
 
-def chat_with_electrician(messages: list, target_language: str = "en") -> str:
+def chat_with_electrician(messages: list, groq_key: str = None, target_language: str = "en") -> str:
     """
     Sends conversational history to Groq Llama-3 model.
     """
-    client = get_groq_client()
+    client = get_groq_client(groq_key)
     if not client:
-        return "Error: GROQ_API_KEY not found in Streamlit Secrets or .env file."
+        return "Error: GROQ_API_KEY not found! Please paste it in the sidebar."
         
     try:
         # Prepend system prompt if not present
@@ -61,22 +65,23 @@ def chat_with_electrician(messages: list, target_language: str = "en") -> str:
     except Exception as e:
         return f"API Error: {str(e)}"
 
-def analyze_image(image_base64: str, prompt: str) -> str:
+def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
     """
     Uses Hugging Face's serverless Vision API to analyze physical equipment.
     """
     import streamlit as st
-    hf_key = None
-    try:
-        hf_key = st.secrets.get("HUGGING_FACE_API_KEY")
-    except Exception:
-        hf_key = HF_TOKEN
+    active_key = hf_key
+    if not active_key:
+        try:
+            active_key = st.secrets.get("HUGGING_FACE_API_KEY")
+        except Exception:
+            active_key = HF_TOKEN
         
-    if not hf_key:
-        return "Error: HUGGING_FACE_API_KEY not found in Streamlit Secrets or .env file."
+    if not active_key:
+        return "Error: Hugging Face API Token not found! Please paste it in the sidebar."
         
     try:
-        hf_client = InferenceClient(api_key=hf_key)
+        hf_client = InferenceClient(api_key=active_key)
         messages = [
             {
                 "role": "user",

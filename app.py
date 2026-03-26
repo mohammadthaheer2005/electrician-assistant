@@ -50,6 +50,15 @@ lang_map = {
 }
 stt_code, tts_code = lang_map[lang_choice]
 
+# API Keys setup
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔑 API Setup (Required)")
+groq_key = st.sidebar.text_input("Groq API Key (For Brain)", type="password", value=st.secrets.get("GROQ_API_KEY", ""))
+hf_key = st.sidebar.text_input("Hugging Face Token (For Vision/Voice)", type="password", value=st.secrets.get("HUGGING_FACE_API_KEY", ""))
+
+if not groq_key or not hf_key:
+    st.sidebar.error("Please enter your API keys to unlock features.")
+
 if mode == "💬 Voice & Chat (గళం)":
     st.header("Multilingual Alexa-Style Assistant")
     st.info("I am your local expert! Talk to me in slang, and I'll give you actionable 1-2-3 fixes.")
@@ -78,7 +87,7 @@ if mode == "💬 Voice & Chat (గళం)":
             st.warning("⚠️ Recording too short. Please tap the mic, speak clearly, and tap again to stop.")
         else:
             with st.spinner("Processing Voice..."):
-                recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
+                recognized_text = voice_utils.process_audio_bytes(audio_bytes, hf_key=hf_key, lang_code=stt_code)
                 if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
                     user_text = recognized_text
                 else:
@@ -96,7 +105,7 @@ if mode == "💬 Voice & Chat (గళం)":
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     chat_history = st.session_state.messages[-8:]
-                    response = ai_engine.chat_with_electrician(chat_history, target_language=lang_choice)
+                    response = ai_engine.chat_with_electrician(chat_history, groq_key=groq_key, target_language=lang_choice)
                     st.markdown(response)
                     
                     # Alexa-style instant playback
@@ -124,17 +133,13 @@ elif mode == "🔧 Dynamic Troubleshooter":
     if problem and st.button("Generate Fix & Tools Required ⚡", use_container_width=True):
         with st.spinner(f"Diagnosing {device}..."):
             sys_prompt = f"Equipment: {device}. Problem: {problem}. Please give an exact Diagnosis, Tools Required, 1-2-3 Step-by-Step Fix, and exact Parts/Specs to Buy (Breakers, wire mm2, capacitor uF). Do not write introduction paragraphs."
-            resp = ai_engine.chat_with_electrician([{"role": "user", "content": sys_prompt}], target_language=lang_choice)
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": sys_prompt}], groq_key=groq_key, target_language=lang_choice)
             st.success("🤖 AI Diagnosis Complete")
             st.markdown(resp)
 
 elif mode == "📹 Live Video / Scanner":
     st.header("Live Video / Nameplate Scanner")
-    st.info("Start a Live Video Feed (WebRTC) or take a quick snapshot. The AI will extract Nameplate data or diagnose burnt components directly from the visual feed.")
-    
-    from streamlit_webrtc import webrtc_streamer
-    
-    webrtc_streamer(key="live_video", rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
+    st.info("Take a quick snapshot from your device camera. The AI will extract Nameplate data or diagnose burnt components directly from the visual feed.")
     
     st.markdown("### 📸 Snapshot Capture")
     col1, col2 = st.columns(2)
@@ -154,7 +159,7 @@ elif mode == "📹 Live Video / Scanner":
                 bytes_data = active_img.getvalue()
                 b64_image = base64.b64encode(bytes_data).decode('utf-8')
                 
-                response = ai_engine.analyze_image(b64_image, custom_prompt)
+                response = ai_engine.analyze_image(b64_image, custom_prompt, hf_key=hf_key)
                 st.success("Analysis Complete!")
                 st.markdown(response)
 
@@ -176,7 +181,7 @@ elif mode == "⚡ Load & Gauge Finder":
     if st.button("Find Gauge Specification"):
         with st.spinner("Calculating Standard Gauge..."):
             prompt = f"What is the exact standard starting gauge (SWG) and ending/running gauge (SWG) for rewinding a {rw_hp} HP {r_phase} Phase motor? List the gauge numbers."
-            resp = ai_engine.chat_with_electrician([{"role": "user", "content": prompt}], target_language=lang_choice)
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": prompt}], groq_key=groq_key, target_language=lang_choice)
             st.info("Gauge Specifications Based on Standards:")
             st.markdown(resp)
 

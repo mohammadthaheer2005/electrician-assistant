@@ -42,7 +42,7 @@ def get_audio_html(b64_audio: str) -> str:
         """
     return md
 
-def process_audio_bytes(audio_bytes: bytes, lang_code: str = 'en-US') -> str:
+def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str = 'en-US') -> str:
     """
     Takes audio bytes from Streamlit audio recorder,
     converts it to text using Hugging Face Whisper API for true Alexa-like robustness.
@@ -51,21 +51,25 @@ def process_audio_bytes(audio_bytes: bytes, lang_code: str = 'en-US') -> str:
     import requests
     import streamlit as st
     
-    hf_key = None
-    try:
-        hf_key = st.secrets.get("HUGGING_FACE_API_KEY")
-    except Exception:
+    active_key = hf_key
+    if not active_key:
+        try:
+            active_key = st.secrets.get("HUGGING_FACE_API_KEY")
+        except Exception:
+            pass
+            
+    if not active_key:
         from dotenv import load_dotenv
         load_dotenv()
-        hf_key = os.getenv("HUGGING_FACE_API_KEY")
+        active_key = os.getenv("HUGGING_FACE_API_KEY")
 
-    if not hf_key:
-        return "Error: Hugging Face API key is missing. Please add it to your secrets to enable Whisper STT."
+    if not active_key:
+        return "Error: Hugging Face API key is missing. Please paste it in the sidebar to enable Whisper STT."
 
     try:
         # API URL for OpenAI Whisper Large V3 Turbo on HF Serverless
         API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
-        headers = {"Authorization": f"Bearer {hf_key}"}
+        headers = {"Authorization": f"Bearer {active_key}"}
         
         # Whisper automatically detects the language, but sending data directly works best
         response = requests.post(API_URL, headers=headers, data=audio_bytes)
