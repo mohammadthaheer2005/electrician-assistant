@@ -68,34 +68,37 @@ def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str =
 
     try:
         import time
-        # API URL for OpenAI Whisper Large V3 Turbo on HF Serverless
-        API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
-        headers = {"Authorization": f"Bearer {active_key}"}
-        
-        # Using a session for better connection persistence
-        session = requests.Session()
+        from huggingface_hub import InferenceClient
         
         # Retry loop for 503 "Model is loading" or network hiccups
         max_retries = 3
         for i in range(max_retries):
             try:
-                # Add a timeout to prevent hanging, and ensure data is sent fully
-                response = session.post(API_URL, headers=headers, data=audio_bytes, timeout=30)
+                # Use the official InferenceClient which handles headers and chunks better
+                hf_client = InferenceClient(api_key=active_key)
                 
-                if response.status_code == 200:
-                    result = response.json()
-                    return result.get("text", "Sorry, no transcript was generated. Please try again.")
-                elif response.status_code == 503 and i < max_retries - 1:
+                # Directly send bytes to the Whisper model
+                transcript = hf_client.audio_transcription(
+                    data=audio_bytes,
+                    model="openai/whisper-large-v3-turbo"
+                )
+                
+                if transcript and isinstance(transcript, str):
+                    return transcript
+                elif isinstance(transcript, dict) and "text" in transcript:
+                    return transcript["text"]
+                else:
+                    return f"Error: No text in response. Got {type(transcript)}"
+
+            except Exception as e:
+                # Catch 503 and retry
+                if "503" in str(e) and i < max_retries - 1:
                     time.sleep(5)
                     continue
-                else:
-                    return f"Error: API status {response.status_code}. Response: {response.text[:200]}"
-            except (requests.exceptions.ContentDecodingError, requests.exceptions.ConnectionError) as ce:
-                if i < max_retries - 1:
+                # Catch Connection errors and retry once
+                if "Connection" in str(e) and i < max_retries - 1:
                     time.sleep(2)
                     continue
-                return f"Error: Persistent connection issue - {ce}"
-            except Exception as e:
                 return f"Error: {e}"
             
     except Exception as e:
