@@ -75,7 +75,7 @@ def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
         try:
             active_key = st.secrets.get("HUGGING_FACE_API_KEY")
         except Exception:
-            active_key = HF_TOKEN
+            active_key = os.getenv("HUGGING_FACE_API_KEY")
         
     if not active_key:
         return "Error: Hugging Face API Token not found! Please paste it in the sidebar."
@@ -92,9 +92,8 @@ def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
             }
         ]
         
-        # Meta's Llama-3.2 11B Vision Instruct is free and highly capable on HF Serverless
         completion = hf_client.chat_completion(
-            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
+            model="Qwen/Qwen2.5-VL-7B-Instruct",
             messages=messages,
             max_tokens=800
         )

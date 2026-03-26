@@ -50,15 +50,7 @@ lang_map = {
 }
 stt_code, tts_code = lang_map[lang_choice]
 
-# API Keys setup
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔑 API Setup (Required)")
-groq_key = st.sidebar.text_input("Groq API Key (For Brain)", type="password", value=st.secrets.get("GROQ_API_KEY", ""))
-hf_key = st.sidebar.text_input("Hugging Face Token (For Vision/Voice)", type="password", value=st.secrets.get("HUGGING_FACE_API_KEY", ""))
-
-if not groq_key or not hf_key:
-    st.sidebar.error("Please enter your API keys to unlock features.")
-
+# Hide API keys in frontend (Handled in backend files)
 if mode == "💬 Voice & Chat (గళం)":
     st.header("Multilingual Alexa-Style Assistant")
     st.info("I am your local expert! Talk to me in slang, and I'll give you actionable 1-2-3 fixes.")
@@ -87,7 +79,7 @@ if mode == "💬 Voice & Chat (గళం)":
             st.warning("⚠️ Recording too short. Please tap the mic, speak clearly, and tap again to stop.")
         else:
             with st.spinner("Processing Voice..."):
-                recognized_text = voice_utils.process_audio_bytes(audio_bytes, hf_key=hf_key, lang_code=stt_code)
+                recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
                 if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
                     user_text = recognized_text
                 else:
@@ -105,7 +97,7 @@ if mode == "💬 Voice & Chat (గళం)":
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     chat_history = st.session_state.messages[-8:]
-                    response = ai_engine.chat_with_electrician(chat_history, groq_key=groq_key, target_language=lang_choice)
+                    response = ai_engine.chat_with_electrician(chat_history, target_language=lang_choice)
                     st.markdown(response)
                     
                     # Alexa-style instant playback
@@ -133,7 +125,7 @@ elif mode == "🔧 Dynamic Troubleshooter":
     if problem and st.button("Generate Fix & Tools Required ⚡", use_container_width=True):
         with st.spinner(f"Diagnosing {device}..."):
             sys_prompt = f"Equipment: {device}. Problem: {problem}. Please give an exact Diagnosis, Tools Required, 1-2-3 Step-by-Step Fix, and exact Parts/Specs to Buy (Breakers, wire mm2, capacitor uF). Do not write introduction paragraphs."
-            resp = ai_engine.chat_with_electrician([{"role": "user", "content": sys_prompt}], groq_key=groq_key, target_language=lang_choice)
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": sys_prompt}], target_language=lang_choice)
             st.success("🤖 AI Diagnosis Complete")
             st.markdown(resp)
 
@@ -159,7 +151,7 @@ elif mode == "📹 Live Video / Scanner":
                 bytes_data = active_img.getvalue()
                 b64_image = base64.b64encode(bytes_data).decode('utf-8')
                 
-                response = ai_engine.analyze_image(b64_image, custom_prompt, hf_key=hf_key)
+                response = ai_engine.analyze_image(b64_image, custom_prompt)
                 st.success("Analysis Complete!")
                 st.markdown(response)
 
@@ -181,18 +173,20 @@ elif mode == "⚡ Load & Gauge Finder":
     if st.button("Find Gauge Specification"):
         with st.spinner("Calculating Standard Gauge..."):
             prompt = f"What is the exact standard starting gauge (SWG) and ending/running gauge (SWG) for rewinding a {rw_hp} HP {r_phase} Phase motor? List the gauge numbers."
-            resp = ai_engine.chat_with_electrician([{"role": "user", "content": prompt}], groq_key=groq_key, target_language=lang_choice)
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": prompt}], target_language=lang_choice)
             st.info("Gauge Specifications Based on Standards:")
             st.markdown(resp)
 
-elif mode == "📏 Circuit & Voltage Calculator":
+elif mode == "📏 Circuit Voltage Drop":
     st.header("Voltage Drop Calculator")
-    current = st.number_input("Load Current (Amps)", value=10.0)
-    distance = st.number_input("Distance to Load (Meters)", value=30.0)
-    wire = st.selectbox("Wire Size (mm²)", [1.5, 2.5, 4.0, 6.0, 10.0])
+    st.info("Ensure wire lengths won't cause dangerous electrical undervoltage.")
+    current = st.number_input("Load Current (Amps)", value=10.0, step=1.0)
+    distance = st.number_input("Distance to Load (Meters)", value=30.0, step=5.0)
+    wire = st.selectbox("Wire Size (mm²)", [1.5, 2.5, 4.0, 6.0, 10.0, 16.0, 25.0])
     if st.button("Analyze Drop"):
         vd, vend, pdrop, sf = calculators.calculate_voltage_drop(current, distance, wire, phase=1)
-        st.write(f"Drop: {vd}V | Status: {sf}")
+        st.metric("Voltage Drop", f"{vd}V ({pdrop}%)")
+        st.success(f"Final Voltage: {vend}V | Status: {sf}")
 
 elif mode == "🛠️ Winding Database":
     st.header("Standard Winding Specs")
