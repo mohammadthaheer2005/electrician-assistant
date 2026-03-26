@@ -23,9 +23,18 @@ Rules:
 """
 
 def get_groq_client():
-    if not GROQ_API_KEY:
+    import streamlit as st
+    api_key = None
+    try:
+        # Check Streamlit Cloud Secrets first
+        api_key = st.secrets["GROQ_API_KEY"]
+    except Exception:
+        # Fallback to local .env
+        api_key = os.getenv("GROQ_API_KEY")
+        
+    if not api_key:
         return None
-    return Groq(api_key=GROQ_API_KEY)
+    return Groq(api_key=api_key)
 
 def chat_with_electrician(messages: list, target_language: str = "en") -> str:
     """
@@ -33,7 +42,7 @@ def chat_with_electrician(messages: list, target_language: str = "en") -> str:
     """
     client = get_groq_client()
     if not client:
-        return "Error: GROQ_API_KEY not found in .env file."
+        return "Error: GROQ_API_KEY not found in Streamlit Secrets or .env file."
         
     try:
         # Prepend system prompt if not present
