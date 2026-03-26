@@ -130,13 +130,18 @@ if mode == "💬 Voice & Chat (గళం)":
             # Native Streamlit Audio Input for Cloud users
             cloud_audio = st.audio_input("Cloud Mic", key="chat_mic_cloud", label_visibility="collapsed")
             if cloud_audio:
-                with st.spinner("Transcribing..."):
-                    q = voice_utils.process_audio_bytes(cloud_audio.getvalue(), lang_code=stt_code)
-                    if not q.startswith("Error"):
-                        st.session_state.messages.append({"role": "user", "content": q})
-                        st.session_state.voice_trigger = q
-                        st.rerun()
-                    else: st.error(q)
+                # IMPORTANT: Only process if it's a NEW recording
+                audio_id = hash(cloud_audio.getvalue())
+                if st.session_state.get("last_processed_audio") != audio_id:
+                    with st.spinner("Transcribing..."):
+                        q = voice_utils.process_audio_bytes(cloud_audio.getvalue(), lang_code=stt_code)
+                        if not q.startswith("Error") and len(q.strip()) > 1:
+                            st.session_state.messages.append({"role": "user", "content": q})
+                            st.session_state.voice_trigger = q
+                            st.session_state.last_processed_audio = audio_id
+                            st.rerun()
+                        elif q.startswith("Error"):
+                            st.error(q)
     
     # Logic: If we have voice_trigger or prompt_text, process it.
     user_text = prompt_text if prompt_text else st.session_state.get("voice_trigger")
@@ -212,12 +217,18 @@ elif mode == "📹 Live Video / Scanner":
             with vm_c2:
                 v_cloud_audio = st.audio_input("Cloud", key="vision_mic_cloud", label_visibility="collapsed")
                 if v_cloud_audio:
-                    with st.spinner("Transcribing..."):
-                        q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
-                        if not q.startswith("Error"):
-                            st.session_state.v_q_input = q
-                            st.rerun()
-                        else: st.error(q)
+                    # Loop prevention
+                    v_audio_id = hash(v_cloud_audio.getvalue())
+                    if st.session_state.get("last_vision_audio") != v_audio_id:
+                        with st.spinner("Transcribing..."):
+                            q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
+                            # Noise filter: skip if just background 'so' or too short
+                            if not q.startswith("Error") and len(q.strip()) > 1 and q.lower().strip() not in ["so.", "so", "hmm.", "hmm"]:
+                                st.session_state.v_q_input = q
+                                st.session_state.last_vision_audio = v_audio_id
+                                st.rerun()
+                            elif q.startswith("Error"):
+                                st.error(q)
         
         with v_col_input:
             manual_q = st.text_input("Technical Query", key="v_q_input", placeholder="e.g. Check for wire damage")
