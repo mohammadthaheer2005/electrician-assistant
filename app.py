@@ -24,12 +24,9 @@ st.title("⚡ Electrician Smart Assistant Premium")
 st.markdown("*Your intelligent, multilingual companion for advanced electrical field work.*")
 
 # Sidebar
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=80)
-st.sidebar.title("Navigation")
-# Sidebar
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=80)
-st.sidebar.title("Navigation")
-mode = st.sidebar.radio("Go to:", [
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=120)
+st.sidebar.title("⚙️ Command Center")
+mode = st.sidebar.radio("Navigation:", [
     "💬 Voice & Chat (గళం)",
     "🔧 Dynamic Troubleshooter",
     "📹 Live Video / Scanner",
@@ -55,42 +52,82 @@ stt_code, tts_code = lang_map[lang_choice]
 
 if mode == "💬 Voice & Chat (గళం)":
     st.header("Multilingual Alexa-Style Assistant")
-    st.info("I am your local expert! Talk to me in slang, and I'll give you actionable 1-2-3 fixes.")
+    st.info("Instant Voice Recognition: Tap the mic and start talking! No server delay.")
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    # -- BROWSER NATIVE STT COMPONENT --
+    st.components.v1.html(f"""
+        <div style="display: flex; justify-content: center; margin-bottom: 20px;">
+            <button id="stt-btn" style="
+                background: linear-gradient(135deg, #2563EB, #1E40AF);
+                color: white; border: none; padding: 15px 40px; 
+                border-radius: 50px; font-weight: bold; cursor: pointer;
+                box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
+                display: flex; align-items: center; gap: 12px; font-family: 'Inter', sans-serif;
+                font-size: 16px; transition: all 0.2s ease;
+            ">
+                <span id="mic-icon">🎙️</span>
+                <span id="btn-text">Tap to Speak</span>
+            </button>
+        </div>
+        <script>
+            const btn = document.getElementById('stt-btn');
+            const icon = document.getElementById('mic-icon');
+            const text = document.getElementById('btn-text');
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
+            if (!SpeechRecognition) {{
+                text.innerText = "Error: Browser not supported";
+                btn.style.opacity = "0.5";
+            }} else {{
+                const recognition = new SpeechRecognition();
+                recognition.lang = '{stt_code}';
+                recognition.onstart = () => {{
+                    text.innerText = "Listening...";
+                    icon.innerText = "🛑";
+                    btn.style.background = "linear-gradient(135deg, #EF4444, #B91C1C)";
+                }};
+                recognition.onresult = (e) => {{
+                    const val = e.results[0][0].transcript;
+                    window.parent.postMessage({{
+                        type: 'streamlit:set_widget_value',
+                        data: {{ id: 'chat_input_voice', value: val }}
+                    }}, '*');
+                }};
+                recognition.onend = () => {{
+                    text.innerText = "Tap to Speak";
+                    icon.innerText = "🎙️";
+                    btn.style.background = "linear-gradient(135deg, #2563EB, #1E40AF)";
+                }};
+                btn.onclick = () => recognition.start();
+            }}
+        </script>
+    """, height=100)
+
+    # Use a hidden text input to catch the voice result
+    voice_transcript = st.text_input("Voice Catch", key="chat_input_voice", label_visibility="collapsed")
+    
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    chat_col, dummy_col = st.columns([4, 1])
+    with chat_col:
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
-                
-        prompt_text = st.chat_input("Type your electrical problem here...")
+        
+        prompt_text = st.chat_input("Type or use Voice button above...")
 
-    with col2:
-        st.markdown(f"### 🎙️ Tap to Speak ({lang_choice})")
-        audio_bytes = audio_recorder(text="Record", recording_color="#e83e8c", neutral_color="#4da6ff", icon_size="2x")
-
-    user_text = ""
-    if audio_bytes and len(audio_bytes) > 30000:
-        with st.spinner("Processing Voice..."):
-            recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
-            if recognized_text and not (recognized_text.startswith("Sorry") or recognized_text.startswith("Error")):
-                user_text = recognized_text
-            elif recognized_text and recognized_text.startswith("Error"):
-                st.error(f"Backend Server Error: {recognized_text}")
-
-    if prompt_text:
-        user_text = prompt_text
+    # Logic: If we have voice_transcript or prompt_text, process it.
+    user_text = prompt_text if prompt_text else voice_transcript
 
     if user_text:
+        # Clear the voice catch to avoid loops
+        if user_text == voice_transcript:
+            st.session_state.chat_input_voice = ""
+            
         st.session_state.messages.append({"role": "user", "content": user_text})
-        with col1:
-            with st.chat_message("user"):
-                st.markdown(user_text)
-
+        with chat_col:
+            # We don't need to manually write user message here, st.rerun will handle it via state
             with st.chat_message("assistant"):
                 with st.spinner("Thinking..."):
                     chat_history = st.session_state.messages[-8:]
@@ -99,8 +136,8 @@ if mode == "💬 Voice & Chat (గళం)":
                     js_audio = voice_utils.text_to_speech(response, lang=tts_code)
                     if js_audio:
                         st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
-
             st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
 
 elif mode == "🔧 Dynamic Troubleshooter":
     st.header("Real-World Equipment Troubleshooter")
@@ -115,10 +152,20 @@ elif mode == "🔧 Dynamic Troubleshooter":
 
 elif mode == "📹 Live Video / Scanner":
     st.header("🔴 Real-Time Video AI Assistant")
-    st.info("Point camera, take snapshot, and ask anything via voice/text.")
-    camera_img = st.camera_input("Capture Live Frame")
-    if camera_img:
-        st.image(camera_img, width=400)
+    st.info("You can now either capture a live frame OR upload an existing component photo for analysis.")
+    
+    col_v1, col_v2 = st.columns(2)
+    with col_v1:
+        camera_img = st.camera_input("Capture Live Frame")
+    with col_v2:
+        upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
+    
+    active_img = camera_img if camera_img else upload_img
+    
+    if active_img:
+        st.image(active_img, width=400, caption="Analyzing this component...")
+        st.session_state.last_vision_img = active_img
+        
         v_col1, v_col2 = st.columns([2, 1])
         with v_col1: prompt = st.text_input("Ask about this photo...", key="v_p")
         with v_col2: v_audio = audio_recorder(text="Ask via Voice", key="v_a")
@@ -131,7 +178,7 @@ elif mode == "📹 Live Video / Scanner":
         
         if q_text and st.button("Analyze Current View 🔍"):
             with st.spinner("AI Analysis..."):
-                b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
+                b64 = base64.b64encode(st.session_state.last_vision_img.getvalue()).decode('utf-8')
                 resp = ai_engine.analyze_image(b64, q_text)
                 st.success("Analysis Complete!")
                 st.markdown(resp)
@@ -147,9 +194,11 @@ elif mode == "⚡ Load & Gauge Finder":
         st.metric("Load Amps", f"{amps}A")
         st.metric("Wire", f"{calculators.recommend_wire_size(amps)}mm²")
     st.markdown("---")
-    if st.button("Find Rewinding Gauge (AI)"):
-        p = f"Rewinding SWG gauge for {hp} HP {phases} Phase motor?"
-        st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
+    st.subheader("🎯 REWINDING GAUGE FINDER")
+    if st.button("Find Exact SWG Specs (Starting & Running)"):
+        with st.spinner("Calculating Standard Gauge..."):
+            p = f"What is the exact standard STARTING/START GAUGE (SWG) and RUNNING/RUN GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? Respond with a clear markdown table showing: | Parameter | SWG Value |."
+            st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
 
 elif mode == "📏 Circuit Voltage Drop":
     st.header("Voltage Drop Analysis")
