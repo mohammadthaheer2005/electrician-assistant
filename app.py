@@ -26,97 +26,143 @@ st.markdown("*Your intelligent, multilingual companion for advanced electrical f
 # Sidebar
 st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=80)
 st.sidebar.title("Navigation")
-# Single Unified Dashboard
-st.header("🔴 Multi-Modal Smart Assistant")
-st.info("Point your camera, upload a photo, or talk to me! I can see what you see and solve any electrical problem.")
+# Sidebar
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=80)
+st.sidebar.title("Navigation")
+mode = st.sidebar.radio("Go to:", [
+    "💬 Voice & Chat (గళం)",
+    "🔧 Dynamic Troubleshooter",
+    "📹 Live Video / Scanner",
+    "⚡ Load & Gauge Finder", 
+    "📏 Circuit Voltage Drop", 
+    "🛠️ Winding Database"
+])
 
-# 1. Vision Assistant (Priority)
-st.markdown("### 📸 Vision & Camera Analysis")
-camera_img = st.camera_input("Capture Live Frame")
-upload_img = st.file_uploader("Or Upload Component Photo", type=["jpg", "png", "jpeg"])
-active_img = camera_img if camera_img else upload_img
+# Language Configuration for Voice
+st.sidebar.markdown("---")
+st.sidebar.subheader("🗣️ Voice Settings")
+lang_choice = st.sidebar.selectbox("Spoken Language", [
+    "English (India)", "Telugu (తెలుగు)", "Hindi (हिंदी)", "Tamil (தமிழ்)", "Malayalam (മലയാളం)"
+])
+lang_map = {
+    "English (India)": ("en-IN", "en-IN"),
+    "Telugu (తెలుగు)": ("te-IN", "te-IN"),
+    "Hindi (हिंदी)": ("hi-IN", "hi-IN"),
+    "Tamil (தமிழ்)": ("ta-IN", "ta-IN"),
+    "Malayalam (മലയാളం)": ("ml-IN", "ml-IN")
+}
+stt_code, tts_code = lang_map[lang_choice]
 
-if active_img:
-    st.session_state.last_vision_img = active_img
-    st.image(active_img, width=400, caption="Analyzing this component...")
+if mode == "💬 Voice & Chat (గళం)":
+    st.header("Multilingual Alexa-Style Assistant")
+    st.info("I am your local expert! Talk to me in slang, and I'll give you actionable 1-2-3 fixes.")
     
-v_col1, v_col2 = st.columns([2, 1])
-with v_col1:
-    vision_prompt = st.text_input("Ask me about the photo...", placeholder="e.g. 'Read this nameplate' or 'Is this capacitor burnt?'", key="v_prompt")
-with v_col2:
-    v_audio = audio_recorder(text="Ask by Voice", icon_size="2x", key="v_audio_main")
-
-if v_audio and len(v_audio) > 30000:
-    with st.spinner("Listening..."):
-        q = voice_utils.process_audio_bytes(v_audio, lang_code=stt_code)
-        if q and not q.startswith("Error"):
-            st.session_state.v_query = q
-            st.info(f"Hearing: {q}")
-
-active_query = vision_prompt if vision_prompt else st.session_state.get("v_query")
-if active_query and st.session_state.get("last_vision_img"):
-    if st.button("Analyze Current View 🔍", use_container_width=True):
-        with st.spinner("AI is examining the image..."):
-            b64_image = base64.b64encode(st.session_state.last_vision_img.getvalue()).decode('utf-8')
-            resp = ai_engine.analyze_image(b64_image, active_query)
-            st.success("Analysis Complete!")
-            st.markdown(resp)
-            js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
-            if js_audio:
-                st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
-
-st.markdown("---")
-
-# 2. Interactive Chat & Diagnosis
-with st.expander("💬 Voice Chat & Problem Diagnosis", expanded=False):
-    st.subheader("Alexa-Style Field Assistant")
-    c1, c2 = st.columns([3, 1])
-    with c1:
-        if "messages" not in st.session_state: st.session_state.messages = []
-        for m in st.session_state.messages:
-            with st.chat_message(m["role"]): st.markdown(m["content"])
-        chat_in = st.chat_input("Diagnose a general problem...")
-    with c2:
-        chat_audio = audio_recorder(text="Tap to Talk", icon_size="2.5x", key="chat_voice")
+    col1, col2 = st.columns([2, 1])
     
-    u_text = chat_in
-    if chat_audio and len(chat_audio) > 30000:
-        recognized = voice_utils.process_audio_bytes(chat_audio, lang_code=stt_code)
-        if recognized and not recognized.startswith("Error"): u_text = recognized
+    with col1:
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-    if u_text:
-        st.session_state.messages.append({"role": "user", "content": u_text})
-        with st.spinner("Consulting field manuals..."):
-            resp = ai_engine.chat_with_electrician(st.session_state.messages[-5:], target_language=lang_choice)
-            st.session_state.messages.append({"role": "assistant", "content": resp})
-            st.rerun()
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                
+        prompt_text = st.chat_input("Type your electrical problem here...")
 
-# 3. Calculators & Database
-with st.expander("⚡ Load, Gauge & Voltage Tools", expanded=False):
-    tabs = st.tabs(["Load Analyzer", "Gauge Finder", "Voltage Drop", "Winding DB"])
-    
-    with tabs[0]:
-        hp = st.number_input("Motor HP", value=2.0)
-        ph = st.selectbox("Phase", [1, 3])
-        if st.button("Run Load Check"):
-            amps, breaker = calculators.calculate_motor_load(hp, ph, 230 if ph==1 else 415)
-            st.metric("Amps", f"{amps}A")
-            st.metric("Wire", f"{calculators.recommend_wire_size(amps)}mm²")
-            
-    with tabs[1]:
-        ghp = st.number_input("HP for Rewinding", value=1.0)
-        if st.button("Get SWG Specs"):
-            p = f"Standard SWG gauges for {ghp} HP motor?"
+    with col2:
+        st.markdown(f"### 🎙️ Tap to Speak ({lang_choice})")
+        audio_bytes = audio_recorder(text="Record", recording_color="#e83e8c", neutral_color="#4da6ff", icon_size="2x")
+
+    user_text = ""
+    if audio_bytes and len(audio_bytes) > 30000:
+        with st.spinner("Processing Voice..."):
+            recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
+            if recognized_text and not (recognized_text.startswith("Sorry") or recognized_text.startswith("Error")):
+                user_text = recognized_text
+            elif recognized_text and recognized_text.startswith("Error"):
+                st.error(f"Backend Server Error: {recognized_text}")
+
+    if prompt_text:
+        user_text = prompt_text
+
+    if user_text:
+        st.session_state.messages.append({"role": "user", "content": user_text})
+        with col1:
+            with st.chat_message("user"):
+                st.markdown(user_text)
+
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    chat_history = st.session_state.messages[-8:]
+                    response = ai_engine.chat_with_electrician(chat_history, target_language=lang_choice)
+                    st.markdown(response)
+                    js_audio = voice_utils.text_to_speech(response, lang=tts_code)
+                    if js_audio:
+                        st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+elif mode == "🔧 Dynamic Troubleshooter":
+    st.header("Real-World Equipment Troubleshooter")
+    st.info("Select equipment and issue for 1-2-3 fixes.")
+    c1, c2 = st.columns(2)
+    with c1: device = st.selectbox("Device", ["Fan", "Motor", "Pump", "Mixer", "DB Board"])
+    with c2: problem = st.text_input("Issue", placeholder="e.g. 'Humming noise'")
+    if problem and st.button("Generate Fix"):
+        with st.spinner("Diagnosing..."):
+            p = f"Equipment: {device}. Problem: {problem}. diagnosis, tools, 1-2-3 fix."
             st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
 
-    with tabs[2]:
-        dist = st.number_input("Meters", value=30)
-        if st.button("Check Drop"):
-            vd, vend, pd, sf = calculators.calculate_voltage_drop(10, dist, 2.5)
-            st.metric("Drop", f"{vd}V")
+elif mode == "📹 Live Video / Scanner":
+    st.header("🔴 Real-Time Video AI Assistant")
+    st.info("Point camera, take snapshot, and ask anything via voice/text.")
+    camera_img = st.camera_input("Capture Live Frame")
+    if camera_img:
+        st.image(camera_img, width=400)
+        v_col1, v_col2 = st.columns([2, 1])
+        with v_col1: prompt = st.text_input("Ask about this photo...", key="v_p")
+        with v_col2: v_audio = audio_recorder(text="Ask via Voice", key="v_a")
+        
+        q_text = prompt
+        if v_audio and len(v_audio) > 30000:
+            with st.spinner("Listening..."):
+                q = voice_utils.process_audio_bytes(v_audio, lang_code=stt_code)
+                if q and not q.startswith("Error"): q_text = q
+        
+        if q_text and st.button("Analyze Current View 🔍"):
+            with st.spinner("AI Analysis..."):
+                b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
+                resp = ai_engine.analyze_image(b64, q_text)
+                st.success("Analysis Complete!")
+                st.markdown(resp)
+                js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
+                if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
-    with tabs[3]:
-        cat = st.selectbox("DB Category", list(knowledge_base.WINDING_DATA.keys()))
-        mod = st.selectbox("DB Model", list(knowledge_base.WINDING_DATA[cat].keys()))
-        st.json(knowledge_base.WINDING_DATA[cat][mod])
+elif mode == "⚡ Load & Gauge Finder":
+    st.header("Motor Load & Rewinding Spec Finder")
+    hp = st.number_input("HP", value=1.0)
+    phases = st.selectbox("Phase", [1, 3])
+    if st.button("Calc Load"):
+        amps, brk = calculators.calculate_motor_load(hp, phases, 230 if phases==1 else 415)
+        st.metric("Load Amps", f"{amps}A")
+        st.metric("Wire", f"{calculators.recommend_wire_size(amps)}mm²")
+    st.markdown("---")
+    if st.button("Find Rewinding Gauge (AI)"):
+        p = f"Rewinding SWG gauge for {hp} HP {phases} Phase motor?"
+        st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
+
+elif mode == "📏 Circuit Voltage Drop":
+    st.header("Voltage Drop Analysis")
+    dist = st.number_input("Distance (Meters)", value=30)
+    wire = st.selectbox("Wire (mm²)", [1.5, 2.5, 4.0, 6.0])
+    if st.button("Calculate Drop"):
+        vd, vend, pd, sf = calculators.calculate_voltage_drop(10, dist, wire)
+        st.metric("Drop", f"{vd}V")
+        st.success(f"Status: {sf}")
+
+elif mode == "🛠️ Winding Database":
+    st.header("Local Model Winding Database")
+    cat = st.selectbox("DB Category", list(knowledge_base.WINDING_DATA.keys()))
+    mod = st.selectbox("DB Model", list(knowledge_base.WINDING_DATA[cat].keys()))
+    st.json(knowledge_base.WINDING_DATA[cat][mod])
 
