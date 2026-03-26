@@ -256,10 +256,10 @@ elif mode == "📚 Electrician's Academy":
         st.latex("Efficiency = \\frac{Output Power}{Input Power} \\times 100")
         
     with tab_d:
-        st.markdown("### 🌀 3-Phase Star vs Delta")
+        st.markdown("### 🌀 3-Phase Star vs Delta Schematic")
         import diagram_utils
-        # Add Star-Delta logic to diagram_utils if needed, or just use 1-way as filler for now
-        st.markdown(f"```mermaid\n{diagram_utils.get_mermaid_diagram('Motor Direct Online (DOL)')}\n```")
+        svg = diagram_utils.get_svg_diagram('Star-Delta Motor Starter', lang=lang_choice)
+        st.components.v1.html(svg, height=450)
 
 elif mode == "⚡ Load & Gauge Finder":
     st.header("⚡ Smart Motor Load & Design Engine")
@@ -340,12 +340,12 @@ elif mode == "🗺️ Winding & Wiring Designer":
     
     if st.button("Generate Official Diagram"):
         with st.spinner("Rendering Schematic..."):
-            mermaid_code = diagram_utils.get_mermaid_diagram(c_type, lang=lang_choice)
+            svg_code = diagram_utils.get_svg_diagram(c_type, lang=lang_choice)
             st.markdown(f"### {c_type} Schematic")
-            st.markdown(f"```mermaid\n{mermaid_code}\n```")
+            st.components.v1.html(svg_code, height=420)
             
             # Provide text description for Voice
-            desc = f"Generating the wiring diagram for {c_type} in {lang_choice}."
+            desc = f"Generating the professional electrical schematic for {c_type} in {lang_choice}."
             js_audio = voice_utils.text_to_speech(desc, lang=tts_code)
             if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
