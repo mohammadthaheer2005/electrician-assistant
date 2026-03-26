@@ -112,9 +112,12 @@ elif mode == "🔧 Dynamic Troubleshooter":
     with c1: device = st.selectbox("Device", ["Fan", "Motor", "Pump", "Mixer", "DB Board"])
     with c2: problem = st.text_input("Issue", placeholder="e.g. 'Humming noise'")
     if problem and st.button("Generate Fix"):
-        with st.spinner("Diagnosing..."):
+        with st.spinner(f"Diagnosing in {lang_choice}..."):
             p = f"Equipment: {device}. Problem: {problem}. diagnosis, tools, 1-2-3 fix."
-            st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
+            resp = ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice)
+            st.markdown(resp)
+            js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
+            if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "📹 Live Video / Scanner":
     st.header("📸 AI Video Scanner & Voice Sync")
@@ -190,6 +193,9 @@ elif mode == "⚡ Load & Gauge Finder":
         amps, brk = calculators.calculate_motor_load(hp, phases, 230 if phases==1 else 415)
         st.metric("Load Amps", f"{amps}A")
         st.metric("Wire", f"{calculators.recommend_wire_size(amps)}mm²")
+        load_resp = f"The load current is {amps} Amperes. Recommended wire size is {calculators.recommend_wire_size(amps)} square millimeters."
+        js_audio = voice_utils.text_to_speech(load_resp, lang=tts_code)
+        if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
     st.markdown("---")
     st.subheader("🎯 REWINDING GAUGE FINDER")
     if st.button("Find Exact SWG Specs (Starting & Running)", type="primary"):
@@ -198,8 +204,11 @@ elif mode == "⚡ Load & Gauge Finder":
             kb_key = f"water_pump_{int(hp)}HP_{'single' if phases==1 else 'three'}_phase"
             kb_data = knowledge_base.WINDING_DATA["motors"].get(kb_key)
             
+            resp_text = ""
             if kb_data:
                 st.success("✅ Found Verified Data in Knowledge Base")
+                resp_text = f"For a {hp} HP {phases} Phase pump, use {kb_data['running_wire_swg']} SWG for running and {kb_data['starting_wire_swg']} SWG for starting. Capacitor: {kb_data['capacitor']}."
+                st.write(resp_text)
                 st.table({
                     "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor"],
                     "Value": [kb_data['running_wire_swg'], kb_data['starting_wire_swg'], kb_data['capacitor']]
@@ -208,8 +217,13 @@ elif mode == "⚡ Load & Gauge Finder":
                 # Use AI for non-KB values with STRICTER instructions
                 p = f"""What is the exact standard STARTING GAUGE (SWG) and RUNNING GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? 
                 IMPORTANT: In most induction motors, Running winding is a THICKER wire (smaller SWG number) and Starting winding is a THINNER wire (larger SWG number). 
-                DO NOT give the same SWG for both. Provide a markdown table."""
-                st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
+                DO NOT give the same SWG for both. Provide a markdown table and a short explanation in {lang_choice}."""
+                resp_text = ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice)
+                st.markdown(resp_text)
+            
+            # Universal Voice Output
+            js_audio = voice_utils.text_to_speech(resp_text, lang=tts_code)
+            if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "📏 Circuit Voltage Drop":
     st.header("Voltage Drop Analysis")
@@ -219,6 +233,9 @@ elif mode == "📏 Circuit Voltage Drop":
         vd, vend, pd, sf = calculators.calculate_voltage_drop(10, dist, wire)
         st.metric("Drop", f"{vd}V")
         st.success(f"Status: {sf}")
+        # Voice Output for status
+        js_audio = voice_utils.text_to_speech(f"Voltage drop is {vd} volts. {sf}", lang=tts_code)
+        if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "🛠️ Winding Database":
     st.header("Local Model Winding Database")
