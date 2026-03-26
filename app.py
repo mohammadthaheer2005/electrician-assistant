@@ -82,6 +82,8 @@ if mode == "💬 Voice & Chat (గళం)":
                 recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
                 if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
                     user_text = recognized_text
+                elif recognized_text and recognized_text.startswith("Error"):
+                    st.error(f"Backend Server Error: {recognized_text}")
                 else:
                     st.error("Audio not clearly recognized. Please try again or check your microphone.")
 
