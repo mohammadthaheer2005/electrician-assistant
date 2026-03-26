@@ -201,28 +201,60 @@ elif mode == "⚡ Load & Gauge Finder":
     if st.button("Find Exact SWG Specs (Starting & Running)", type="primary"):
         with st.spinner("Calculating Standard Gauge..."):
             # Check Knowledge Base First
-            kb_key = f"water_pump_{int(hp)}HP_{'single' if phases==1 else 'three'}_phase"
+            kb_key = f"water_pump_{hp}HP_{'single' if phases==1 else 'three'}_phase"
+            # Normalize HP for KB lookup (e.g. 1.0 -> 1)
+            kb_key = kb_key.replace("1.0HP", "1HP").replace("2.0HP", "2HP").replace("0.5HP", "0.5HP").replace("3.0HP", "3HP")
             kb_data = knowledge_base.WINDING_DATA["motors"].get(kb_key)
             
             resp_text = ""
             if kb_data:
-                st.success("✅ Found Verified Data in Knowledge Base")
-                resp_text = f"For a {hp} HP {phases} Phase pump, use {kb_data['running_wire_swg']} SWG for running and {kb_data['starting_wire_swg']} SWG for starting. Capacitor: {kb_data['capacitor']}."
+                st.success("✅ Found Verified Industrial Data")
+                resp_text = f"For a {hp} HP {phases}-Phase motor, official data recommends: {kb_data['running_wire_swg']} SWG for Running and {kb_data['starting_wire_swg']} SWG for Starting. Capacitor: {kb_data['capacitor']}."
                 st.write(resp_text)
+                
+                # Show full technical table
                 st.table({
-                    "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor"],
-                    "Value": [kb_data['running_wire_swg'], kb_data['starting_wire_swg'], kb_data['capacitor']]
+                    "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor", "Running Turns", "Starting Turns"],
+                    "Value": [
+                        kb_data['running_wire_swg'], 
+                        kb_data['starting_wire_swg'], 
+                        kb_data['capacitor'],
+                        kb_data.get('turns_running', 'Check core size'),
+                        kb_data.get('turns_starting', 'Check core size')
+                    ]
                 })
             else:
-                # Use AI for non-KB values with STRICTER instructions
                 p = f"""What is the exact standard STARTING GAUGE (SWG) and RUNNING GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? 
-                IMPORTANT: In most induction motors, Running winding is a THICKER wire (smaller SWG number) and Starting winding is a THINNER wire (larger SWG number). 
-                DO NOT give the same SWG for both. Provide a markdown table and a short explanation in {lang_choice}."""
+                Provide a markdown table and a short explanation in {lang_choice}."""
                 resp_text = ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice)
                 st.markdown(resp_text)
             
             # Universal Voice Output
             js_audio = voice_utils.text_to_speech(resp_text, lang=tts_code)
+            if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
+
+elif mode == "🗺️ Winding & Wiring Designer":
+    st.header("🗺️ Professional Wiring Diagram Designer")
+    st.info("Select a circuit type to generate an official wiring schematic.")
+    
+    import diagram_utils
+    
+    c_type = st.selectbox("Select Circuit", [
+        "1-Way Switch", 
+        "2-Way Switch (Staircase)", 
+        "Ceiling Fan with Regulator", 
+        "Motor Direct Online (DOL)"
+    ])
+    
+    if st.button("Generate Official Diagram"):
+        with st.spinner("Rendering Schematic..."):
+            mermaid_code = diagram_utils.get_mermaid_diagram(c_type, lang=lang_choice)
+            st.markdown(f"### {c_type} Schematic")
+            st.markdown(f"```mermaid\n{mermaid_code}\n```")
+            
+            # Provide text description for Voice
+            desc = f"Generating the wiring diagram for {c_type} in {lang_choice}."
+            js_audio = voice_utils.text_to_speech(desc, lang=tts_code)
             if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "📏 Circuit Voltage Drop":
