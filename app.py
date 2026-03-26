@@ -151,66 +151,84 @@ elif mode == "📹 Live Video / Scanner":
     st.info("Experience the future of electrical field work: Scan hardware or upload photos for AI expertise.")
     
     # -- Image Origin Selection --
-    v_tab1, v_tab2 = st.tabs(["📷 Live Camera", "📂 Upload Photo"])
+    v_tab1, v_tab2 = st.tabs(["📷 Live Camera (Voice Sync)", "📂 Upload Photo"])
     
     active_img = None
     with v_tab1:
+        st.caption("🎙️ TIP: Say 'Analyze this' or ask a question while the camera is on.")
         camera_img = st.camera_input("Scanner Active", label_visibility="collapsed")
         if camera_img: active_img = camera_img
     with v_tab2:
         upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
         if upload_img: active_img = upload_img
     
-    # -- Unified AI Call Dashboard --
+    # -- 🚀 THE ULTIMATE VISION PIPELINE --
     if active_img:
         st.divider()
-        st.subheader("🤖 AI Diagnostic Dashboard")
-        st.image(active_img, width=500, caption="Analyzing this component")
-        st.session_state.last_vision_img = active_img
+        sv_col1, sv_col2 = st.columns([1, 1.2])
         
-        # 2) User Asks Question Dashboard 🎤
-        v_col_mic, v_col_input = st.columns([1, 2])
-        
-        with v_col_mic:
-            st.write("🎙️ SPEAK TO AI")
-            v_cloud_audio = st.audio_input("Voice Query", key="vision_mic_cloud", label_visibility="collapsed")
-            if v_cloud_audio:
-                v_audio_id = hash(v_cloud_audio.getvalue())
-                if st.session_state.get("last_vision_audio") != v_audio_id:
-                    with st.spinner("Transcribing..."):
-                        q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
-                        if not q.startswith("Error") and len(q.strip()) > 1:
-                            st.session_state.v_voice_q = q
-                            st.session_state.last_vision_audio = v_audio_id
-                            st.rerun()
-                        elif q.startswith("Error"):
-                            st.error(q)
-        
-        with v_col_input:
-            # Use 'value' to populate from voice but a different 'key' to avoid conflicts
-            voice_q = st.session_state.get("v_voice_q", "")
-            manual_q = st.text_input("Technical Query", value=voice_q, key="v_manual_q", placeholder=f"Ask in {lang_choice}...")
+        with sv_col1:
+            st.image(active_img, use_container_width=True, caption="Pipeline Target")
+            # Store image in history if not already there
+            if "vision_history" not in st.session_state: st.session_state.vision_history = []
             
-            if st.button("🔍 START AI ANALYSIS", type="primary", use_container_width=True):
-                with st.spinner(f"Analyzing in {lang_choice}..."):
+        with sv_col2:
+            # 1. Pipeline Voice Interface
+            st.subheader("🎙️ Pipeline Voice Control")
+            v_audio_input = st.audio_input("Ask about this Image", key="v_pipeline_mic")
+            
+            # Use 'value' to populate from voice but a different 'key' to avoid conflicts
+            v_voice_q = st.session_state.get("v_pipeline_trans", "")
+            manual_q = st.text_input("Technical Query", value=v_voice_q, key="v_manual_q", placeholder=f"Ask in {lang_choice}...")
+            
+            # Automatic Voice Trigger Logic
+            if v_audio_input:
+                v_audio_id = hashlib.md5(v_audio_input.getvalue()).hexdigest()
+                if st.session_state.get("last_pipeline_audio") != v_audio_id:
+                    with st.spinner("Pipeline Transcribing..."):
+                        q = voice_utils.process_audio_bytes(v_audio_input.getvalue(), lang_code=stt_code)
+                        if not q.startswith("Error") and len(q.strip()) > 1:
+                            st.session_state.v_pipeline_trans = q
+                            st.session_state.last_pipeline_audio = v_audio_id
+                            st.rerun()
+
+            if st.button("🔍 RUN PIPELINE ANALYSIS", type="primary", use_container_width=True):
+                with st.spinner(f"AI Eye analyzing in {lang_choice}..."):
                     b64 = base64.b64encode(active_img.getvalue()).decode('utf-8')
                     # Clear voice q after analysis
-                    if "v_voice_q" in st.session_state: del st.session_state["v_voice_q"]
+                    if "v_pipeline_trans" in st.session_state: del st.session_state["v_pipeline_trans"]
                     
                     final_q = (manual_q if manual_q else "Analyze this component.") + f" Respond entirely in {lang_choice}."
                     resp = ai_engine.analyze_image(b64, final_q)
                     st.session_state.v_resp = resp
                     st.session_state.v_q_final = final_q
+                    
+                    # Save to History
+                    st.session_state.vision_history.append({"img": active_img, "q": final_q, "resp": resp})
+                    if len(st.session_state.vision_history) > 5: st.session_state.vision_history.pop(0)
                     st.rerun()
 
-        # 5) AI Results 🔊
-        if "v_resp" in st.session_state:
-            st.markdown("---")
-            st.markdown(f"**⚡ Analysis for:** *{st.session_state.get('v_q_final', 'Visual Scan')}*")
-            st.success("Expert Review Complete!")
-            st.markdown(st.session_state.v_resp)
-            js_audio = voice_utils.text_to_speech(st.session_state.v_resp, lang=tts_code)
-            if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
+    # -- 🎞️ SCAN HISTORY FILMSTRIP --
+    if st.session_state.get("vision_history"):
+        st.markdown("---")
+        st.subheader("🎞️ Scan History (Pipeline Buffer)")
+        h_cols = st.columns(len(st.session_state.vision_history))
+        for idx, entry in enumerate(reversed(st.session_state.vision_history)):
+            with h_cols[idx]:
+                st.image(entry["img"], width=100)
+                if st.button(f"View #{len(st.session_state.vision_history)-idx}", key=f"hist_{idx}"):
+                    st.session_state.v_resp = entry["resp"]
+                    st.session_state.v_q_final = entry["q"]
+                    st.rerun()
+
+    # -- 🔊 PIPELINE AI RESULTS --
+    if "v_resp" in st.session_state:
+        st.markdown("---")
+        st.success("🤖 Pipeline Analysis Complete!")
+        st.markdown(f"**⚡ Query:** *{st.session_state.get('v_q_final', 'Visual Scan')}*")
+        st.info(st.session_state.v_resp)
+        js_audio = voice_utils.text_to_speech(st.session_state.v_resp, lang=tts_code)
+        if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "📊 Performance & Efficiency":
     st.header("📊 Motor Performance & Efficiency Analyzer")
