@@ -4,104 +4,190 @@ import ai_engine
 import voice_utils
 import calculators
 import knowledge_base
+import base64
 
 st.set_page_config(page_title="ElectroAssist AI", page_icon="⚡", layout="wide")
 
-st.title("⚡ Electrician Smart Assistant")
-st.markdown("Your interactive, Alexa-like helper for electrical troubleshooting and calculations.")
+# -- Premium CSS Styling --
+st.markdown("""
+<style>
+    .reportview-container {background: #f4f6f9;}
+    .sidebar .sidebar-content {background: #eef1f6;}
+    h1 {color: #1E3A8A; font-family: 'Arial Black', sans-serif;}
+    h2, h3 {color: #2563EB; font-family: 'Arial', sans-serif;}
+    .stMetric {background-color: #ffffff; padding: 10px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);}
+    .stAlert {border-radius: 8px;}
+</style>
+""", unsafe_allow_html=True)
 
-# Sidebar Navigation
-mode = st.sidebar.radio("Navigation", ["💬 Chat & Voice Assistant", "⚡ Motor Load Analyzer", "📏 Wire & Voltage Calculator", "🛠️ Winding Helber DB"])
+st.title("⚡ Electrician Smart Assistant Premium")
+st.markdown("*Your intelligent, multilingual companion for advanced electrical field work.*")
 
-if mode == "💬 Chat & Voice Assistant":
-    st.header("Multilingual Voice & Chat")
+# Sidebar
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", width=80)
+st.sidebar.title("Navigation")
+mode = st.sidebar.radio("Go to:", ["💬 AI Chat & Vision (గళం/Voice)", "⚡ Motor Load Analyzer", "📏 Circuit & Voltage Calculator", "🛠️ Winding Database"])
 
-    # Initialize chat history
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+# Language Configuration for Voice
+st.sidebar.markdown("---")
+st.sidebar.subheader("🗣️ Voice Settings")
+lang_choice = st.sidebar.selectbox("Spoken Language", [
+    "English (India)", "Telugu (తెలుగు)", "Hindi (हिंदी)", "Tamil (தமிழ்)", "Malayalam (മലയാളം)"
+])
+lang_map = {
+    "English (India)": ("en-IN", "en"),
+    "Telugu (తెలుగు)": ("te-IN", "te"),
+    "Hindi (हिंदी)": ("hi-IN", "hi"),
+    "Tamil (தமிழ்)": ("ta-IN", "ta"),
+    "Malayalam (മലയാളം)": ("ml-IN", "ml")
+}
+stt_code, tts_code = lang_map[lang_choice]
 
-    # Display chat
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Voice Input (Alexa-like experience)
-    st.markdown("### 🎙️ Tap to Speak")
-    audio_bytes = audio_recorder(text="Click to Record", recording_color="#e83e8c", neutral_color="#ffffff", icon_size="2x")
+if mode == "💬 AI Chat & Vision (గళం/Voice)":
+    st.header("Multilingual AI & Vision Diagnostics")
     
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Initialize chat history
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
+
+        # Display chat
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+                
+        # Text Input
+        prompt_text = st.chat_input("Type your electrical problem here...")
+
+    with col2:
+        st.markdown(f"### 🎙️ Tap to Speak ({lang_choice})")
+        audio_bytes = audio_recorder(text="Record", recording_color="#e83e8c", neutral_color="#4da6ff", icon_size="2x")
+        
+        st.markdown("---")
+        st.markdown("### 📸 Vision Upload")
+        st.markdown("Upload a photo of a burnt motor, panel, or circuit for AI inspection.")
+        uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+        if uploaded_file is not None:
+            st.image(uploaded_file, caption="Image for Analysis", use_container_width=True)
+
     user_text = ""
+    vision_mode = False
     
+    # Process Voice Input
     if audio_bytes:
-        with st.spinner("Transcribing audio..."):
-            recognized_text = voice_utils.process_audio_bytes(audio_bytes)
+        with st.spinner("Processing Voice..."):
+            recognized_text = voice_utils.process_audio_bytes(audio_bytes, lang_code=stt_code)
             if recognized_text and not recognized_text.startswith("Sorry") and not recognized_text.startswith("Error"):
                 user_text = recognized_text
-                st.success(f"Heard: {user_text}")
             else:
-                st.error(recognized_text)
+                st.error("Audio not clearly recognized. Please try again.")
 
-    # Text Input fallback
-    prompt_text = st.chat_input("Or type your electrical question here...")
-    
+    # Process Text Input
     if prompt_text:
         user_text = prompt_text
 
-    if user_text:
-        # Add to state and display
-        st.session_state.messages.append({"role": "user", "content": user_text})
-        with st.chat_message("user"):
-            st.markdown(user_text)
+    # Action Trigger
+    if user_text or (uploaded_file and st.button("Inspect Image 🔍")):
+        if uploaded_file and not user_text:
+            user_text = "Please examine this electrical component and identify any visible issues or standard specifications."
+            vision_mode = True
+        elif uploaded_file and user_text:
+            vision_mode = True
 
-        # Get response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                # limit history to last 10 messages to save tokens
-                chat_history = st.session_state.messages[-10:]
-                
-                response = ai_engine.chat_with_electrician(chat_history)
-                st.markdown(response)
-                
-                # Convert response to Voice (Alexa functionality)
-                b64_audio = voice_utils.text_to_speech(response)
-                if b64_audio:
-                    html_audio = voice_utils.get_audio_html(b64_audio)
-                    st.components.v1.html(html_audio, height=0)
+        st.session_state.messages.append({"role": "user", "content": f"{'[Photo Attached] ' if vision_mode else ''}{user_text}"})
+        
+        with col1:
+            with st.chat_message("user"):
+                st.markdown(user_text)
 
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            with st.chat_message("assistant"):
+                with st.spinner("Analyzing..."):
+                    if vision_mode:
+                        # Convert image to base64
+                        bytes_data = uploaded_file.getvalue()
+                        b64_image = base64.b64encode(bytes_data).decode('utf-8')
+                        response = ai_engine.analyze_image(b64_image, user_text)
+                    else:
+                        chat_history = st.session_state.messages[-8:]
+                        # Request AI to reply in the user's chosen local language
+                        response = ai_engine.chat_with_electrician(chat_history, target_language=lang_choice)
+                    
+                    st.markdown(response)
+                    
+                    # Convert response to Voice automatically
+                    b64_audio = voice_utils.text_to_speech(response, lang=tts_code)
+                    if b64_audio:
+                        html_audio = voice_utils.get_audio_html(b64_audio)
+                        st.components.v1.html(html_audio, height=0)
+
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
 elif mode == "⚡ Motor Load Analyzer":
-    st.header("Motor Load Analyzer")
-    hp = st.number_input("Motor HP", min_value=0.1, max_value=500.0, value=2.0)
-    phase = st.selectbox("Phase", [1, 3])
-    voltage = st.number_input("Voltage (V)", value=230 if phase==1 else 415)
+    st.header("Advanced Motor Load Analyzer")
+    st.info("Input your motor specifications to generate safe current ratings and cable sizing based on Standard Ampacity guidelines.")
     
-    if st.button("Calculate"):
+    colA, colB, colC = st.columns(3)
+    with colA:
+        hp = st.number_input("Motor HP", min_value=0.1, max_value=1000.0, value=2.0, step=0.5)
+    with colB:
+        phase = st.selectbox("Phase", [1, 3])
+    with colC:
+        voltage = st.number_input("Voltage (V)", value=230 if phase==1 else 415, step=10)
+        
+    st.markdown("---")
+    
+    if st.button("Calculate Safety Parameters ⚡", use_container_width=True):
         amps, breaker = calculators.calculate_motor_load(hp, phase, voltage)
         wire_size = calculators.recommend_wire_size(amps)
-        st.success(f"**Full Load Amperes (FLA):** {amps} A")
-        st.info(f"**Recommended Breaker Size:** {breaker} A")
-        st.warning(f"**Minimum Wire Size:** {wire_size} mm²")
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Full Load Amperes (FLA)", f"{amps} A")
+        m2.metric("Recommended Breaker", f"{breaker} A")
+        m3.metric("Min. Copper Wire", f"{wire_size} mm²")
+        st.success("Calculations are formulated with a 25% safety overhead for breaker sizing.")
 
-elif mode == "📏 Wire & Voltage Calculator":
-    st.header("Wire Gauge & Voltage Drop Calculator")
-    current = st.number_input("Current (Amps)", value=10.0)
-    distance = st.number_input("Distance (Meters)", value=30.0)
-    wire_size = st.selectbox("Wire Size (mm²)", [1.0, 1.5, 2.5, 4.0, 6.0, 10.0, 16.0, 25.0, 35.0])
-    phase = st.selectbox("Phase", [1, 3])
+elif mode == "📏 Circuit & Voltage Calculator":
+    st.header("Precision Distance & Voltage Calculator")
+    st.info("Ensure your long-distance pump/fan runs without burning out due to low voltage.")
     
-    if st.button("Analyze Drop"):
+    cA, cB = st.columns(2)
+    with cA:
+        current = st.number_input("Current (Amps) load", value=10.0)
+        distance = st.number_input("Distance to Motor (Meters)", value=30.0)
+    with cB:
+        wire_size = st.selectbox("Wire Gauge Used (mm²)", [1.0, 1.5, 2.5, 4.0, 6.0, 10.0, 16.0, 25.0, 35.0])
+        phase = st.selectbox("Phase Selection", [1, 3])
+        
+    st.markdown("---")
+    if st.button("Analyze Cable Viability", use_container_width=True):
         vd, v_end, p_drop, safety = calculators.calculate_voltage_drop(current, distance, wire_size, phase=phase)
-        st.write(f"**Voltage Drop:** {vd} V")
-        st.write(f"**Voltage at Load:** {v_end} V")
-        st.write(f"**Percentage Drop:** {p_drop} %")
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Voltage Drop", f"{vd} V")
+        m2.metric("Terminal Voltage", f"{v_end} V")
+        m3.metric("Percentage Drop", f"{p_drop} %")
+        
         if safety == "Safe":
-            st.success("Safety Status: SAFE (<= 5% drop)")
+            st.success("✅ Cable is Safe. Voltage drop is within the 5% tolerance limit.")
         else:
-            st.error("Safety Status: UNSAFE (> 5% drop)")
+            st.error("⚠️ UNSAFE. Voltage drop exceeds 5%. The motor will overheat. Please use a thicker wire gauge.")
 
-elif mode == "🛠️ Winding Helber DB":
-    st.header("Winding Information Database")
-    category = st.selectbox("Select Category", list(knowledge_base.WINDING_DATA.keys()))
-    item = st.selectbox("Select Model", list(knowledge_base.WINDING_DATA[category].keys()))
+elif mode == "🛠️ Winding Database":
+    st.header("Standard Master Winding Reference")
+    st.info("Select a device category to view Standard Indian specification data for Rewinding.")
     
-    st.json(knowledge_base.WINDING_DATA[category][item])
+    category = st.selectbox("Select Equipment Type", list(knowledge_base.WINDING_DATA.keys()))
+    item = st.selectbox("Select Specific Model", list(knowledge_base.WINDING_DATA[category].keys()))
+    
+    data = knowledge_base.WINDING_DATA[category][item]
+    
+    st.markdown("### Internal Specifications")
+    for key, val in data.items():
+        if isinstance(val, list):
+            st.markdown(f"**{key.replace('_', ' ').title()}:**")
+            for bullet in val:
+                st.markdown(f"- {bullet}")
+        else:
+            st.markdown(f"**{key.replace('_', ' ').title()}:** {val}")

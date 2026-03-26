@@ -33,7 +33,7 @@ def get_audio_html(b64_audio: str) -> str:
         """
     return md
 
-def process_audio_bytes(audio_bytes: bytes) -> str:
+def process_audio_bytes(audio_bytes: bytes, lang_code: str = 'en-US') -> str:
     """
     Takes audio bytes from Streamlit audio recorder,
     converts it to text using SpeechRecognition.
@@ -41,8 +41,8 @@ def process_audio_bytes(audio_bytes: bytes) -> str:
     try:
         r = sr.Recognizer()
         audio_data = sr.AudioData(audio_bytes, sample_rate=44100, sample_width=2)
-        # Using Google Free Web Speech API
-        text = r.recognize_google(audio_data)
+        # Using Google Free Web Speech API with specific language hint
+        text = r.recognize_google(audio_data, language=lang_code)
         return text
     except sr.UnknownValueError:
         return "Sorry, I could not understand the audio."
