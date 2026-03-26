@@ -42,6 +42,27 @@ def get_audio_html(b64_audio: str) -> str:
         """
     return md
 
+def listen_local_mic(lang_code: str = 'en-IN') -> str:
+    """
+    Uses local system microphone (requires PyAudio) for lightning-fast voice input.
+    Best for local testing or 'Command Center' style apps on personal laptops.
+    """
+    import speech_recognition as sr
+    r = sr.Recognizer()
+    try:
+        with sr.Microphone() as source:
+            r.adjust_for_ambient_noise(source, duration=0.5)
+            # Short timeout for 'Command Center' feel
+            audio = r.listen(source, timeout=5, phrase_time_limit=10)
+            text = r.recognize_google(audio, language=lang_code)
+            return text
+    except sr.UnknownValueError:
+        return "Error: Could not understand audio."
+    except sr.RequestError as e:
+        return f"Error: Google Speech service failed; {e}"
+    except Exception as e:
+        return f"Error: {e}"
+
 def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str = 'en-US') -> str:
     """
     Takes audio bytes from Streamlit audio recorder,

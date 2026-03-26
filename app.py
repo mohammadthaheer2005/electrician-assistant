@@ -115,17 +115,30 @@ if mode == "💬 Voice & Chat (గళం)":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        prompt_text = st.chat_input("Type or use Voice button above...")
-
-    # Logic: If we have voice_transcript or prompt_text, process it.
-    user_text = prompt_text if prompt_text else voice_transcript
+        c1, c2 = st.columns([5, 1])
+        with c1: prompt_text = st.chat_input("Type or use Voice button above...")
+        with c2:
+            if st.button("🎤 Mic", key="chat_mic"):
+                with st.spinner("Listening..."):
+                    q = voice_utils.listen_local_mic(lang_code=stt_code)
+                    if not q.startswith("Error"):
+                        st.session_state.messages.append({"role": "user", "content": q})
+                        # Trigger AI response logic below by setting user_text
+                        st.session_state.voice_trigger = q
+                        st.rerun()
+                    else: st.error(q)
+    
+    # Logic: If we have voice_trigger or prompt_text, process it.
+    user_text = prompt_text if prompt_text else st.session_state.get("voice_trigger")
 
     if user_text:
-        # Clear the voice catch to avoid loops
-        if user_text == voice_transcript:
-            st.session_state.chat_input_voice = ""
+        # Clear the voice trigger to avoid loops
+        if "voice_trigger" in st.session_state:
+            del st.session_state["voice_trigger"]
+        
+        if prompt_text: # If it was from chat_input, append it (voice was already appended)
+            st.session_state.messages.append({"role": "user", "content": user_text})
             
-        st.session_state.messages.append({"role": "user", "content": user_text})
         with chat_col:
             # We don't need to manually write user message here, st.rerun will handle it via state
             with st.chat_message("assistant"):
@@ -167,19 +180,23 @@ elif mode == "📹 Live Video / Scanner":
         st.session_state.last_vision_img = active_img
         
         v_col1, v_col2 = st.columns([2, 1])
-        with v_col1: prompt = st.text_input("Ask about this photo...", key="v_p")
-        with v_col2: v_audio = audio_recorder(text="Ask via Voice", key="v_a")
+        with v_col1: prompt = st.text_input("Ask about this photo...", key="v_p", placeholder="e.g. Read the RPM or check for damage")
+        with v_col2: 
+            if st.button("🎤 Local Mic (Pro)"):
+                with st.spinner("Listening..."):
+                    q = voice_utils.listen_local_mic(lang_code=stt_code)
+                    if not q.startswith("Error"):
+                        st.session_state.v_p = q
+                        st.rerun()
+                    else: st.error(q)
         
-        q_text = prompt
-        if v_audio and len(v_audio) > 30000:
-            with st.spinner("Listening..."):
-                q = voice_utils.process_audio_bytes(v_audio, lang_code=stt_code)
-                if q and not q.startswith("Error"): q_text = q
-        
-        if q_text and st.button("Analyze Current View 🔍"):
-            with st.spinner("AI Analysis..."):
+        # New "Analyze" Button as requested
+        if st.button("🔍 ANALYZE IMAGE", type="primary", use_container_width=True):
+            with st.spinner("Processing Visual Data..."):
                 b64 = base64.b64encode(st.session_state.last_vision_img.getvalue()).decode('utf-8')
-                resp = ai_engine.analyze_image(b64, q_text)
+                # Use prompt if provided, else default to 'What is this?'
+                final_q = st.session_state.v_p if st.session_state.v_p else "Analyze this electrical component in detail."
+                resp = ai_engine.analyze_image(b64, final_q)
                 st.success("Analysis Complete!")
                 st.markdown(resp)
                 js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
@@ -195,10 +212,24 @@ elif mode == "⚡ Load & Gauge Finder":
         st.metric("Wire", f"{calculators.recommend_wire_size(amps)}mm²")
     st.markdown("---")
     st.subheader("🎯 REWINDING GAUGE FINDER")
-    if st.button("Find Exact SWG Specs (Starting & Running)"):
+    if st.button("Find Exact SWG Specs (Starting & Running)", type="primary"):
         with st.spinner("Calculating Standard Gauge..."):
-            p = f"What is the exact standard STARTING/START GAUGE (SWG) and RUNNING/RUN GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? Respond with a clear markdown table showing: | Parameter | SWG Value |."
-            st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
+            # Check Knowledge Base First
+            kb_key = f"water_pump_{int(hp)}HP_{'single' if phases==1 else 'three'}_phase"
+            kb_data = knowledge_base.WINDING_DATA["motors"].get(kb_key)
+            
+            if kb_data:
+                st.success("✅ Found Verified Data in Knowledge Base")
+                st.table({
+                    "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor"],
+                    "Value": [kb_data['running_wire_swg'], kb_data['starting_wire_swg'], kb_data['capacitor']]
+                })
+            else:
+                # Use AI for non-KB values with STRICTER instructions
+                p = f"""What is the exact standard STARTING GAUGE (SWG) and RUNNING GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? 
+                IMPORTANT: In most induction motors, Running winding is a THICKER wire (smaller SWG number) and Starting winding is a THINNER wire (larger SWG number). 
+                DO NOT give the same SWG for both. Provide a markdown table."""
+                st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
 
 elif mode == "📏 Circuit Voltage Drop":
     st.header("Voltage Drop Analysis")
