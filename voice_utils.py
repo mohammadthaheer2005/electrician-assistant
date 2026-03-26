@@ -67,18 +67,23 @@ def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str =
         return "Error: Hugging Face API key is missing. Please paste it in the sidebar to enable Whisper STT."
 
     try:
+        import time
         # API URL for OpenAI Whisper Large V3 Turbo on HF Serverless
         API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
         headers = {"Authorization": f"Bearer {active_key}"}
         
-        # Whisper automatically detects the language, but sending data directly works best
-        response = requests.post(API_URL, headers=headers, data=audio_bytes)
-        
-        if response.status_code == 200:
-            result = response.json()
-            return result.get("text", "Sorry, no transcript was generated. Please try again.")
-        else:
-            return f"Error: API returned status {response.status_code} - {response.text}"
+        # Retry loop for 503 "Model is loading"
+        max_retries = 3
+        for i in range(max_retries):
+            response = requests.post(API_URL, headers=headers, data=audio_bytes)
+            if response.status_code == 200:
+                result = response.json()
+                return result.get("text", "Sorry, no transcript was generated. Please try again.")
+            elif response.status_code == 503 and i < max_retries - 1:
+                time.sleep(5)
+                continue
+            else:
+                return f"Error: API returned status {response.status_code} - {response.text}"
             
     except Exception as e:
         return f"Error processing audio with Whisper: {e}"

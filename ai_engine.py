@@ -81,6 +81,7 @@ def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
         return "Error: Hugging Face API Token not found! Please paste it in the sidebar."
         
     try:
+        import time
         hf_client = InferenceClient(api_key=active_key)
         messages = [
             {
@@ -92,12 +93,21 @@ def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
             }
         ]
         
-        completion = hf_client.chat_completion(
-            model="Qwen/Qwen2.5-VL-7B-Instruct",
-            messages=messages,
-            max_tokens=800
-        )
-        return completion.choices[0].message.content
+        # Retry loop for 503 "Model is loading"
+        max_retries = 3
+        for i in range(max_retries):
+            try:
+                completion = hf_client.chat_completion(
+                    model="Qwen/Qwen2.5-VL-7B-Instruct",
+                    messages=messages,
+                    max_tokens=800
+                )
+                return completion.choices[0].message.content
+            except Exception as e:
+                if "503" in str(e) and i < max_retries - 1:
+                    time.sleep(5)
+                    continue
+                raise e
         
     except Exception as e:
         return f"Vision Error: {str(e)}"
