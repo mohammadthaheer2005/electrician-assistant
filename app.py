@@ -306,34 +306,51 @@ elif mode == "⚡ Load & Gauge Finder":
         if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
     
     st.markdown("---")
-    st.subheader("🎯 REWINDING GAUGE FINDER")
+    st.subheader("🎯 MASTER REWINDING GAUGE FINDER")
     if st.button("Find Exact SWG Specs (Starting & Running)", type="primary"):
         with st.spinner("Calculating Standard Gauge..."):
             # Check Knowledge Base First
-            kb_key = f"water_pump_{hp}HP_{'single' if phases==1 else 'three'}_phase"
+            obj_type = "water_pump" if phases == 1 else "motor"
+            kb_key = f"{obj_type}_{hp}HP_{'single' if phases==1 else 'three'}_phase"
             # Normalize HP for KB lookup (e.g. 1.0 -> 1)
-            kb_key = kb_key.replace("1.0HP", "1HP").replace("2.0HP", "2HP").replace("0.5HP", "0.5HP").replace("3.0HP", "3HP")
+            kb_key = kb_key.replace("1.0HP", "1HP").replace("2.0HP", "2HP").replace("0.5HP", "0.5HP").replace("3.0HP", "3HP").replace("5.0HP", "5HP").replace("7.5HP", "7.5HP")
             kb_data = knowledge_base.WINDING_DATA["motors"].get(kb_key)
             
             resp_text = ""
             if kb_data:
-                st.success("✅ Found Verified Industrial Data")
-                resp_text = f"For a {hp} HP {phases}-Phase motor, official data recommends: {kb_data['running_wire_swg']} SWG for Running and {kb_data['starting_wire_swg']} SWG for Starting. Capacitor: {kb_data['capacitor']}."
-                st.write(resp_text)
+                st.success(f"✅ Found Verified Industrial Data for {hp}HP {phases}-Phase")
                 
-                # Show full technical table
-                st.table({
-                    "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor", "Running Turns", "Starting Turns"],
-                    "Value": [
-                        kb_data['running_wire_swg'], 
-                        kb_data['starting_wire_swg'], 
-                        kb_data['capacitor'],
-                        kb_data.get('turns_running', 'Check core size'),
-                        kb_data.get('turns_starting', 'Check core size')
-                    ]
-                })
+                if phases == 1:
+                    resp_text = f"For 1-Phase: Running {kb_data['running_wire_swg']} SWG, Starting {kb_data['starting_wire_swg']} SWG. Capacitor: {kb_data['capacitor']}."
+                    table_data = {
+                        "Parameter": ["Running Winding SWG", "Starting Winding SWG", "Capacitor", "Running Turns", "Starting Turns", "Coil Pitch", "Connection"],
+                        "Value": [
+                            kb_data['running_wire_swg'], 
+                            kb_data['starting_wire_swg'], 
+                            kb_data['capacitor'],
+                            kb_data.get('turns_running', 'Check core size'),
+                            kb_data.get('turns_starting', 'Check core size'),
+                            kb_data.get('pitch', 'Standard'),
+                            kb_data.get('connection', 'Series')
+                        ]
+                    }
+                else:
+                    resp_text = f"For 3-Phase: All windings are {kb_data['wire_swg']} SWG. Connection: {kb_data['connection']}."
+                    table_data = {
+                        "Parameter": ["Phase Winding SWG (U,V,W)", "Turns per Phase", "Coil Pitch", "Internal Connection", "Industrial Notes"],
+                        "Value": [
+                            kb_data['wire_swg'], 
+                            kb_data.get('turns', 'Check nameplate'),
+                            kb_data.get('pitch', 'Standard'),
+                            kb_data.get('connection', 'Star/Delta'),
+                            kb_data.get('notes', 'Verified data')
+                        ]
+                    }
+                
+                st.write(resp_text)
+                st.table(table_data)
             else:
-                p = f"""What is the exact standard STARTING GAUGE (SWG) and RUNNING GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? 
+                p = f"""What is the exact official STARTING GAUGE (SWG) and RUNNING GAUGE (SWG) for rewinding a {hp} HP {phases} Phase motor? 
                 Provide a markdown table and a short explanation in {lang_choice}."""
                 resp_text = ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice)
                 st.markdown(resp_text)

@@ -85,7 +85,30 @@ WINDING_DATA = {
             "starting_wire_swg": "19 / 20",
             "capacitor": "72uF / 100uF",
             "turns_running": "35, 35, 35",
-            "turns_starting": "60, 60"
+            "turns_starting": "60, 60",
+            "pitch": "1-8, 1-10, 1-12",
+            "connection": "Series"
+        },
+        "motor_3HP_three_phase": {
+            "wire_swg": "21 + 21 (Double Wire)",
+            "turns": "45, 45, 45",
+            "pitch": "1-8, 1-10",
+            "connection": "Star",
+            "notes": "3-Phase windings are identical for U, V, W."
+        },
+        "motor_5HP_three_phase": {
+            "wire_swg": "19 + 19 (Double Wire)",
+            "turns": "36, 36, 36",
+            "pitch": "1-8, 1-10",
+            "connection": "Star-Delta",
+            "notes": "Standard industrial 1440 RPM data."
+        },
+        "motor_7.5HP_three_phase": {
+            "wire_swg": "18 + 18 (Double Wire)",
+            "turns": "28, 28, 28",
+            "pitch": "1-10, 1-12",
+            "connection": "Delta",
+            "notes": "High torque industrial winding."
         }
     }
 }
