@@ -45,17 +45,36 @@ def get_audio_html(b64_audio: str) -> str:
 def process_audio_bytes(audio_bytes: bytes, lang_code: str = 'en-US') -> str:
     """
     Takes audio bytes from Streamlit audio recorder,
-    converts it to text using SpeechRecognition.
+    converts it to text using Hugging Face Whisper API for true Alexa-like robustness.
     """
+    import os
+    import requests
+    import streamlit as st
+    
+    hf_key = None
     try:
-        r = sr.Recognizer()
-        audio_data = sr.AudioData(audio_bytes, sample_rate=44100, sample_width=2)
-        # Using Google Free Web Speech API with specific language hint
-        text = r.recognize_google(audio_data, language=lang_code)
-        return text
-    except sr.UnknownValueError:
-        return "Sorry, I could not understand the audio."
-    except sr.RequestError as e:
-        return f"Could not request results; {e}"
+        hf_key = st.secrets.get("HUGGING_FACE_API_KEY")
+    except Exception:
+        from dotenv import load_dotenv
+        load_dotenv()
+        hf_key = os.getenv("HUGGING_FACE_API_KEY")
+
+    if not hf_key:
+        return "Error: Hugging Face API key is missing. Please add it to your secrets to enable Whisper STT."
+
+    try:
+        # API URL for OpenAI Whisper Large V3 Turbo on HF Serverless
+        API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
+        headers = {"Authorization": f"Bearer {hf_key}"}
+        
+        # Whisper automatically detects the language, but sending data directly works best
+        response = requests.post(API_URL, headers=headers, data=audio_bytes)
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result.get("text", "Sorry, no transcript was generated. Please try again.")
+        else:
+            return f"Error: API returned status {response.status_code} - {response.text}"
+            
     except Exception as e:
-        return f"Error processing audio: {e}"
+        return f"Error processing audio with Whisper: {e}"

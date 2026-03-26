@@ -28,10 +28,10 @@ st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3233/3233483.png", widt
 st.sidebar.title("Navigation")
 mode = st.sidebar.radio("Go to:", [
     "💬 Voice & Chat (గళం)",
-    "🔧 Step-by-Step Troubleshooter",
-    "📸 Motor Nameplate Scanner",
-    "⚡ Motor Load Analyzer", 
-    "📏 Circuit & Voltage Calculator", 
+    "🔧 Dynamic Troubleshooter",
+    "📹 Live Video / Scanner",
+    "⚡ Load & Gauge Finder", 
+    "📏 Circuit Voltage Drop", 
     "🛠️ Winding Database"
 ])
 
@@ -107,106 +107,59 @@ if mode == "💬 Voice & Chat (గళం)":
 
             st.session_state.messages.append({"role": "assistant", "content": response})
 
-elif mode == "🔧 Step-by-Step Troubleshooter":
+elif mode == "🔧 Dynamic Troubleshooter":
     st.header("Real-World Equipment Troubleshooter")
-    st.info("A rule-based AI diagnostic flow exactly like a master technician.")
-    
-    device = st.selectbox("1. Select Equipment", ["Single Phase Water Motor", "Ceiling Fan", "Mixer Grinder"])
-    
-    if device == "Single Phase Water Motor":
-        problem = st.selectbox("2. Select Problem Component", ["Motor humming but not turning", "Motor completely dead", "Overheating/Burning smell", "Low Speed / Low Water Pressure"])
-        st.markdown("---")
-        
-        if problem == "Motor humming but not turning":
-            st.subheader("🤖 AI Diagnosis")
-            st.error("**Likely Cause:** Starting Capacitor Failure or Centrifugal Switch Stuck")
-            st.markdown("""
-            **🛠 Tools Required:** Multimeter, Screwdriver, Insulated Pliers.
-            
-            **Step-by-Step Fix:**
-            1. **Turn OFF Main Power (Breaker).** Verify 0V with Multimeter.
-            2. Open the terminal box and inspect the capacitor. Look for bulging or leaks.
-            3. Spin the motor shaft by hand. If it rotates freely, the capacitor is dead.
-            4. Remove capacitor, discharge it across pins with an insulated screwdriver.
-            
-            **🛍️ What You Need to Buy:**
-            👉 Standard Run Capacitor for 1HP: **10µF - 15µF / 440V AC**
-            👉 Standard Run Capacitor for 2HP: **20µF - 25µF / 440V AC**
-            """)
-        elif problem == "Motor completely dead":
-            st.subheader("🤖 AI Diagnosis")
-            st.warning("**Likely Cause:** No Supply Voltage or Internal Winding Open")
-            st.markdown("""
-            **🛠 Tools Required:** Multimeter/Clamp Meter.
-            
-            **Step-by-Step Fix:**
-            1. Measure voltage at the motor terminals. Should be ~230V.
-            2. If 0V, check the incoming breaker/overload relay switch.
-            3. If voltage is present, disconnect power and measure coil continuity (Running & Starting coils).
-            4. If coils read Open (OL), winding is burnt. Send for rewinding.
-            
-            **🛍️ What You Need to Buy:**
-            👉 If overload relay failed: **Thermal Overload Relay (Match Motor FLA rating)**
-            """)
-            
-    elif device == "Ceiling Fan":
-        problem = st.selectbox("2. Select Problem Component", ["Fan not rotating (Just humming)", "Slow speed", "Wobbling / Noise"])
-        st.markdown("---")
-        if problem == "Fan not rotating (Just humming)":
-            st.subheader("🤖 AI Diagnosis")
-            st.error("**Likely Cause:** Dead Capacitor or Jammed Ball Bearings")
-            st.markdown("""
-            **🛠 Tools Required:** Tester, Insulated Screwdriver, Spanner.
-            
-            **Step-by-Step Fix:**
-            1. **Turn OFF switch (and fan regulator).**
-            2. Try spinning fan manually. If stiff, bearings (6201/6202 size) need replacement.
-            3. If free, uncap the top canopy and check the black box (capacitor).
-            4. Replace it.
-            
-            **🛍️ What You Need to Buy:**
-            👉 New Fan Capacitor: **2.5µF (Standard) or 3.15µF (If old fan winding is weak)**
-            👉 Replacement Bearings (if tight): **6201ZZ or 6202ZZ series**
-            """)
-
-elif mode == "📸 Motor Nameplate Scanner":
-    st.header("Motor Nameplate OCR Scanner")
-    st.info("Point your camera at a motor's sticker plate. The AI will extract exact data to verify load and components.")
+    st.info("Select your equipment and describe the exact issue. The AI will instantly generate a safe, step-by-step fix.")
     
     col1, col2 = st.columns(2)
     with col1:
-        st.write("Take a LIVE photo:")
-        camera_img = st.camera_input("Scanner")
+        device = st.selectbox("1. Select Equipment", [
+            "Single Phase Water Motor", "3-Phase Industrial Motor", 
+            "Ceiling Fan", "Mixer Grinder", "Submersible Pump"
+        ])
+    with col2:
+        problem = st.text_input("2. Describe Problem", placeholder="e.g. 'Humming noise and burning smell'")
+        
+    st.markdown("---")
+    if problem and st.button("Generate Fix & Tools Required ⚡", use_container_width=True):
+        with st.spinner(f"Diagnosing {device}..."):
+            sys_prompt = f"Equipment: {device}. Problem: {problem}. Please give an exact Diagnosis, Tools Required, 1-2-3 Step-by-Step Fix, and exact Parts/Specs to Buy (Breakers, wire mm2, capacitor uF). Do not write introduction paragraphs."
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": sys_prompt}], target_language=lang_choice)
+            st.success("🤖 AI Diagnosis Complete")
+            st.markdown(resp)
+
+elif mode == "📹 Live Video / Scanner":
+    st.header("Live Video / Nameplate Scanner")
+    st.info("Start a Live Video Feed (WebRTC) or take a quick snapshot. The AI will extract Nameplate data or diagnose burnt components directly from the visual feed.")
+    
+    from streamlit_webrtc import webrtc_streamer
+    
+    webrtc_streamer(key="live_video", rtc_configuration={"iceServers": [{"urls": ["stun:stun.l.google.com:19302"]}]})
+    
+    st.markdown("### 📸 Snapshot Capture")
+    col1, col2 = st.columns(2)
+    with col1:
+        camera_img = st.camera_input("Take Live Snapshot")
     
     with col2:
-        st.write("Or Upload existing photo:")
-        upload_img = st.file_uploader("Nameplate File", type=["jpg", "png", "jpeg"])
+        upload_img = st.file_uploader("Or Upload existing photo", type=["jpg", "png", "jpeg"])
         
     active_img = camera_img if camera_img else upload_img
     
     if active_img:
         st.image(active_img, width=400)
-        if st.button("Scan Nameplate 🔍", use_container_width=True):
-            with st.spinner("Analyzing Nameplate Specifications..."):
+        custom_prompt = st.text_input("What should the AI look for?", value="Extract Voltage, Power (HP/kW), Current (FLA/Amps), Phase, RPM, and Frame Size. Or identify any physical damage.")
+        if st.button("Analyze Image 🔍", use_container_width=True):
+            with st.spinner("Analyzing high-definition visual feed..."):
                 bytes_data = active_img.getvalue()
                 b64_image = base64.b64encode(bytes_data).decode('utf-8')
                 
-                custom_prompt = """
-                Extract specific data from this motor nameplate. List clearly:
-                - Voltage (V)
-                - Power (HP or kW)
-                - Current (FLA / Amps)
-                - Phase
-                - RPM
-                - Frame Size
-                If you cannot see it clearly, explain what is missing.
-                """
                 response = ai_engine.analyze_image(b64_image, custom_prompt)
                 st.success("Analysis Complete!")
                 st.markdown(response)
 
-elif mode == "⚡ Motor Load Analyzer":
-    st.header("Advanced Motor Load Analyzer")
+elif mode == "⚡ Load & Gauge Finder":
+    st.header("Advanced Motor Load Analyzer & Gauge Finder")
     hp = st.number_input("Motor HP", min_value=0.1, max_value=1000.0, value=2.0, step=0.5)
     phase = st.selectbox("Phase", [1, 3])
     voltage = st.number_input("Voltage (V)", value=230 if phase==1 else 415, step=10)

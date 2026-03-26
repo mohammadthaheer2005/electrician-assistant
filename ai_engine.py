@@ -1,11 +1,13 @@
 import os
 from groq import Groq
+from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
 # Load env variables
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HF_TOKEN = os.getenv("HUGGING_FACE_API_KEY")
 
 SYSTEM_PROMPT = """
 You are the **ElectroAssist AI**, a master electrician from the local shop. Your voice and tone should be exactly like a highly experienced, friendly human expert talking directly to an apprentice on site.
@@ -61,29 +63,37 @@ def chat_with_electrician(messages: list, target_language: str = "en") -> str:
 
 def analyze_image(image_base64: str, prompt: str) -> str:
     """
-    Uses Groq's Vision model to analyze electrical components.
+    Uses Hugging Face's serverless Vision API to analyze physical equipment.
     """
-    client = get_groq_client()
-    if not client:
-        return "Error: GROQ_API_KEY not found."
+    import streamlit as st
+    hf_key = None
+    try:
+        hf_key = st.secrets.get("HUGGING_FACE_API_KEY")
+    except Exception:
+        hf_key = HF_TOKEN
+        
+    if not hf_key:
+        return "Error: HUGGING_FACE_API_KEY not found in Streamlit Secrets or .env file."
         
     try:
+        hf_client = InferenceClient(api_key=hf_key)
         messages = [
-            {"role": "system", "content": "You are a master electrician diagnosing visual issues from photos."},
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": prompt},
+                    {"type": "text", "text": "You are a master electrician. " + prompt},
                     {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
                 ]
             }
         ]
-        completion = client.chat.completions.create(
-            model="llama-3.2-90b-vision-preview",
+        
+        # Meta's Llama-3.2 11B Vision Instruct is free and highly capable on HF Serverless
+        completion = hf_client.chat_completion(
+            model="meta-llama/Llama-3.2-11B-Vision-Instruct",
             messages=messages,
-            temperature=0.2,
             max_tokens=800
         )
         return completion.choices[0].message.content
+        
     except Exception as e:
         return f"Vision Error: {str(e)}"
