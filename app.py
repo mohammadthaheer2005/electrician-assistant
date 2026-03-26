@@ -56,9 +56,6 @@ if mode == "💬 Voice & Chat (గళం)":
     
     st.info("🎙️ Unified AI Voice Control: Tap the mic below to speak in your language.")
 
-    # Use a hidden text input to catch the voice result
-    voice_transcript = st.text_input("Voice Catch", key="chat_input_voice", label_visibility="collapsed")
-    
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -87,13 +84,12 @@ if mode == "💬 Voice & Chat (గళం)":
                         elif q.startswith("Error"):
                             st.error(q)
     
-    # Logic: If we have voice_trigger/prompt/browser-STT, process it.
-    final_input = prompt_text if prompt_text else (st.session_state.get("voice_trigger") if st.session_state.get("voice_trigger") else voice_transcript)
+    # Logic: If we have voice_trigger or prompt, process it.
+    final_input = prompt_text if prompt_text else st.session_state.get("voice_trigger")
 
     if final_input:
         # Clear triggers to avoid loops
         if "voice_trigger" in st.session_state: del st.session_state["voice_trigger"]
-        if "chat_input_voice" in st.session_state: st.session_state["chat_input_voice"] = ""
         
         if prompt_text: # If it was from chat_input, append it
             st.session_state.messages.append({"role": "user", "content": final_input})
@@ -154,18 +150,23 @@ elif mode == "📹 Live Video / Scanner":
                     with st.spinner("Transcribing..."):
                         q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
                         if not q.startswith("Error") and len(q.strip()) > 1:
-                            st.session_state.v_q_input = q
+                            st.session_state.v_voice_q = q
                             st.session_state.last_vision_audio = v_audio_id
                             st.rerun()
                         elif q.startswith("Error"):
                             st.error(q)
         
         with v_col_input:
-            manual_q = st.text_input("Technical Query", key="v_q_input", placeholder=f"Ask in {lang_choice}...")
+            # Use 'value' to populate from voice but a different 'key' to avoid conflicts
+            voice_q = st.session_state.get("v_voice_q", "")
+            manual_q = st.text_input("Technical Query", value=voice_q, key="v_manual_q", placeholder=f"Ask in {lang_choice}...")
+            
             if st.button("🔍 START AI ANALYSIS", type="primary", use_container_width=True):
                 with st.spinner(f"Analyzing in {lang_choice}..."):
                     b64 = base64.b64encode(active_img.getvalue()).decode('utf-8')
-                    # Force language instructions in the prompt too
+                    # Clear voice q after analysis
+                    if "v_voice_q" in st.session_state: del st.session_state["v_voice_q"]
+                    
                     final_q = (manual_q if manual_q else "Analyze this component.") + f" Respond entirely in {lang_choice}."
                     resp = ai_engine.analyze_image(b64, final_q)
                     st.session_state.v_resp = resp
