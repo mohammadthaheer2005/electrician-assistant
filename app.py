@@ -167,6 +167,18 @@ elif mode == "⚡ Load & Gauge Finder":
         amps, breaker = calculators.calculate_motor_load(hp, phase, voltage)
         st.metric("Full Load Amperes", f"{amps} A")
         st.metric("Recommended Wire Size", f"{calculators.recommend_wire_size(amps)} mm²")
+        st.success("Calculations are formulated with a 25% safety overhead for breaker sizing.")
+        
+    st.markdown("---")
+    st.subheader("🎯 Starting and Ending Gauge Finder (Rewinding)")
+    rw_hp = st.number_input("Motor HP for Rewinding", value=1.0, step=0.5)
+    r_phase = st.selectbox("Motor Phase", [1, 3], key="rw_phase")
+    if st.button("Find Gauge Specification"):
+        with st.spinner("Calculating Standard Gauge..."):
+            prompt = f"What is the exact standard starting gauge (SWG) and ending/running gauge (SWG) for rewinding a {rw_hp} HP {r_phase} Phase motor? List the gauge numbers."
+            resp = ai_engine.chat_with_electrician([{"role": "user", "content": prompt}], target_language=lang_choice)
+            st.info("Gauge Specifications Based on Standards:")
+            st.markdown(resp)
 
 elif mode == "📏 Circuit & Voltage Calculator":
     st.header("Voltage Drop Calculator")
