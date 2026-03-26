@@ -47,7 +47,13 @@ def listen_local_mic(lang_code: str = 'en-IN') -> str:
     Uses local system microphone (requires PyAudio) for lightning-fast voice input.
     Best for local testing or 'Command Center' style apps on personal laptops.
     """
-    import speech_recognition as sr
+    try:
+        import speech_recognition as sr
+        # PyAudio check
+        import pyaudio
+    except ImportError:
+        return "Error: PyAudio not installed. Run 'pip install pyaudio' on your local computer to use this feature."
+    
     r = sr.Recognizer()
     try:
         with sr.Microphone() as source:
