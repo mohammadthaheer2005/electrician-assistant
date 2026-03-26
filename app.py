@@ -203,8 +203,20 @@ elif mode == "📹 Live Video / Scanner":
                     st.session_state.v_resp = resp
                     st.session_state.v_q_final = final_q
                     
+                    # -- 🎯 WINDING SPEC DETECTION (EXTRA FEATURE) --
+                    # Detect if response contains winding info
+                    w_info = ""
+                    if "SWG" in resp or "gauge" in resp.lower() or "winding" in resp.lower():
+                        # Extract a snippet or keep it as a flag
+                        w_info = "⚡ Winding Specs Detected"
+                    
                     # Save to History
-                    st.session_state.vision_history.append({"img": active_img, "q": final_q, "resp": resp})
+                    st.session_state.vision_history.append({
+                        "img": active_img, 
+                        "q": final_q, 
+                        "resp": resp,
+                        "w_info": w_info
+                    })
                     if len(st.session_state.vision_history) > 5: st.session_state.vision_history.pop(0)
                     st.rerun()
 
@@ -216,15 +228,20 @@ elif mode == "📹 Live Video / Scanner":
         for idx, entry in enumerate(reversed(st.session_state.vision_history)):
             with h_cols[idx]:
                 st.image(entry["img"], width=100)
+                if entry.get("w_info"): st.caption("⚡ [Winding Data]")
                 if st.button(f"View #{len(st.session_state.vision_history)-idx}", key=f"hist_{idx}"):
                     st.session_state.v_resp = entry["resp"]
                     st.session_state.v_q_final = entry["q"]
+                    st.session_state.v_curr_w_info = entry.get("w_info", "")
                     st.rerun()
 
     # -- 🔊 PIPELINE AI RESULTS --
     if "v_resp" in st.session_state:
         st.markdown("---")
         st.success("🤖 Pipeline Analysis Complete!")
+        if st.session_state.get("v_curr_w_info"):
+            st.warning(f"🎯 **Detected technical data:** {st.session_state.v_curr_w_info}")
+            
         st.markdown(f"**⚡ Query:** *{st.session_state.get('v_q_final', 'Visual Scan')}*")
         st.info(st.session_state.v_resp)
         js_audio = voice_utils.text_to_speech(st.session_state.v_resp, lang=tts_code)
