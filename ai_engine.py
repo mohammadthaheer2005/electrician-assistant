@@ -116,6 +116,27 @@ def analyze_image(image_base64: str, prompt: str, hf_key: str = None) -> str:
                     # 500 or other errors, try next model
                     break 
         
+        # If HF models fail, try Groq Vision (Lightning Fast & Reliable)
+        try:
+            groq_client = get_groq_client(hf_key) # hf_key here might be groq_key if passed manually
+            if groq_client:
+                completion = groq_client.chat.completions.create(
+                    model="llama-3.2-11b-vision-preview",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {"type": "text", "text": "Analyze this electrical component carefully: " + prompt},
+                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_base64}"}}
+                            ]
+                        }
+                    ],
+                    max_tokens=1024
+                )
+                return completion.choices[0].message.content
+        except Exception as groq_err:
+            last_err = f"HF Error: {last_err} | Groq Error: {groq_err}"
+            
         return f"Vision Error (Total Failure): {str(last_err)}"
             
     except Exception as e:

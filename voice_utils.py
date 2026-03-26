@@ -95,40 +95,32 @@ def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str =
 
     try:
         import time
-        from huggingface_hub import InferenceClient
+        import requests
         
-        # Retry loop for 503 "Model is loading" or network hiccups
+        # Whisper v3 Turbo endpoint
+        API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
+        headers = {"Authorization": f"Bearer {active_key}", "Content-Type": "audio/webm"}
+        
         max_retries = 3
         for i in range(max_retries):
             try:
-                # Use the official InferenceClient post method for full control over headers
-                hf_client = InferenceClient(api_key=active_key)
+                # Use standard requests for better control and reliability
+                response = requests.post(API_URL, headers=headers, data=audio_bytes, timeout=30)
                 
-                # audio-recorder-streamlit sends webm or wav depending on browser
-                # audio/webm is widely supported by Whisper on HF
-                response_data = hf_client.post(
-                    data=audio_bytes,
-                    model="openai/whisper-large-v3-turbo",
-                    headers={"Content-Type": "audio/webm"}
-                )
-                
-                import json
-                result = json.loads(response_data.decode())
-                
-                if isinstance(result, dict) and "text" in result:
-                    return result["text"]
-                elif isinstance(result, str):
-                    return result
-                else:
-                    return f"Error: Unexpected response format {result}"
-
-            except Exception as e:
-                # Catch 503 and retry
-                if "503" in str(e) and i < max_retries - 1:
+                if response.status_code == 200:
+                    result = response.json()
+                    if isinstance(result, dict) and "text" in result:
+                        return result["text"]
+                    return str(result)
+                elif response.status_code == 503:
+                    # Model is loading
                     time.sleep(5)
                     continue
-                # Catch Connection errors and retry once
-                if "Connection" in str(e) and i < max_retries - 1:
+                else:
+                    return f"Error: HF API {response.status_code} - {response.text}"
+
+            except Exception as e:
+                if i < max_retries - 1:
                     time.sleep(2)
                     continue
                 return f"Error: {e}"
