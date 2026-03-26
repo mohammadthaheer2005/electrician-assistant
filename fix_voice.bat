@@ -1,24 +1,34 @@
 @echo off
+setlocal
 echo ---------------------------------------------------
 echo 🛠️ ELECTROASSIST VOICE FIXER 🛠️
 echo ---------------------------------------------------
-echo Installing high-speed Local Mic dependencies...
+echo Phase 1: Installing standard dependencies...
 
-pip install pyaudio SpeechRecognition
+pip install SpeechRecognition gTTS requests
+
+echo.
+echo Phase 2: Installing PyAudio (High-Speed Local Mic)...
+pip install pyaudio
 
 if %errorlevel% neq 0 (
     echo.
-    echo ❌ ERROR: Failed to install PyAudio automatically.
+    echo ⚠️ Standard PyAudio install failed. Trying alternative (pipwin)...
+    pip install pipwin
+    pipwin install pyaudio
+)
+
+if %errorlevel% neq 0 (
     echo.
-    echo Try this instead:
-    echo 1. Go to https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio (or search for PyAudio wheels)
-    echo 2. Download the .whl file for your Python version (e.g., cp311).
-    echo 3. Run: pip install [filename].whl
-    echo.
+    echo ❌ ERROR: Automated install failed. 
+    echo Please follow these manual steps:
+    echo 1. Go to: https://github.com/intx0h/pyaudio_wheels
+    echo 2. Download the .whl for your Python version (run 'python --version' first).
+    echo 3. Run: pip install [the_downloaded_file].whl
 ) else (
     echo.
-    echo ✅ SUCCESS: Local Mic is now ready! 
-    echo Please restart your run.bat to use the 'Mic' button.
+    echo ✅ SUCCESS: Voice System is now ready! 
+    echo Please RESTART your run.bat to activate changes.
 )
 
 pause

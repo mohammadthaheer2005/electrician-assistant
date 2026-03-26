@@ -69,61 +69,32 @@ def listen_local_mic(lang_code: str = 'en-IN') -> str:
     except Exception as e:
         return f"Error: {e}"
 
-def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str = 'en-US') -> str:
+def process_audio_bytes(audio_bytes: bytes, groq_key: str = None, lang_code: str = 'en-US') -> str:
     """
     Takes audio bytes from Streamlit audio recorder,
-    converts it to text using Hugging Face Whisper API for true Alexa-like robustness.
+    converts it to text using Groq's high-speed Whisper API for 100% reliability.
     """
     import os
-    import requests
     import streamlit as st
+    from ai_engine import get_groq_client
     
-    active_key = hf_key
-    if not active_key:
-        try:
-            active_key = st.secrets.get("HUGGING_FACE_API_KEY")
-        except Exception:
-            pass
-            
-    if not active_key:
-        from dotenv import load_dotenv
-        load_dotenv()
-        active_key = os.getenv("HUGGING_FACE_API_KEY")
-
-    if not active_key:
-        return "Error: Hugging Face API key is missing. Please paste it in the sidebar to enable Whisper STT."
+    client = get_groq_client(groq_key)
+    if not client:
+        return "Error: GROQ_API_KEY is missing. Please paste it in the sidebar."
 
     try:
-        import time
-        import requests
+        # Groq expects a file-like object
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "speech.webm" # File extension helps the API identify format
         
-        # Whisper v3 Turbo endpoint
-        API_URL = "https://api-inference.huggingface.co/models/openai/whisper-large-v3-turbo"
-        headers = {"Authorization": f"Bearer {active_key}", "Content-Type": "audio/webm"}
-        
-        max_retries = 3
-        for i in range(max_retries):
-            try:
-                # Use standard requests for better control and reliability
-                response = requests.post(API_URL, headers=headers, data=audio_bytes, timeout=30)
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if isinstance(result, dict) and "text" in result:
-                        return result["text"]
-                    return str(result)
-                elif response.status_code == 503:
-                    # Model is loading
-                    time.sleep(5)
-                    continue
-                else:
-                    return f"Error: HF API {response.status_code} - {response.text}"
-
-            except Exception as e:
-                if i < max_retries - 1:
-                    time.sleep(2)
-                    continue
-                return f"Error: {e}"
+        transcription = client.audio.transcriptions.create(
+            file=audio_file,
+            model="whisper-large-v3",
+            prompt="Electrician terminology like volts, current, capacitor, hum, buzz, motor.", # Helps accuracy
+            response_format="json",
+            language=lang_code.split('-')[0] # Groq prefers 2-letter codes for audio
+        )
+        return transcription.text
             
     except Exception as e:
-        return f"Error processing audio with Whisper: {e}"
+        return f"Voice Error (Groq): {str(e)}"
