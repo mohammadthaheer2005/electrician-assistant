@@ -132,8 +132,8 @@ elif mode == "🔧 Dynamic Troubleshooter":
             st.markdown(resp)
 
 elif mode == "📹 Live Video / Scanner":
-    st.header("Live Video / Nameplate Scanner")
-    st.info("Take a quick snapshot from your device camera. The AI will extract Nameplate data or diagnose burnt components directly from the visual feed.")
+    st.header("🔴 LIVE Video AI Assistant & Scanner")
+    st.info("Point your camera at the motor or board. Capture a snapshot to start a visual diagnostic 'Video Call' with the AI.")
     
     st.markdown("### 📸 Snapshot Capture")
     col1, col2 = st.columns(2)

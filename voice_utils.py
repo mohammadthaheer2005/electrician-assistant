@@ -77,18 +77,19 @@ def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str =
                 # Use the official InferenceClient which handles headers and chunks better
                 hf_client = InferenceClient(api_key=active_key)
                 
-                # Directly send bytes to the Whisper model
-                transcript = hf_client.audio_transcription(
-                    data=audio_bytes,
+                # The correct method for Whisper on InferenceClient
+                result = hf_client.automatic_speech_recognition(
+                    audio_bytes,
                     model="openai/whisper-large-v3-turbo"
                 )
                 
-                if transcript and isinstance(transcript, str):
-                    return transcript
-                elif isinstance(transcript, dict) and "text" in transcript:
-                    return transcript["text"]
+                # automatic_speech_recognition returns a dict like {'text': '...'}
+                if isinstance(result, dict) and "text" in result:
+                    return result["text"]
+                elif isinstance(result, str):
+                    return result
                 else:
-                    return f"Error: No text in response. Got {type(transcript)}"
+                    return f"Error: Unexpected response type {type(result)}"
 
             except Exception as e:
                 # Catch 503 and retry
