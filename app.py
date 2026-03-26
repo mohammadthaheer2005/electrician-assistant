@@ -115,15 +115,25 @@ if mode == "💬 Voice & Chat (గళం)":
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
         
-        c1, c2 = st.columns([5, 1])
-        with c1: prompt_text = st.chat_input("Type or use Voice button above...")
+        c1, c2, c3 = st.columns([4, 1, 1])
+        with c1: prompt_text = st.chat_input("Type or use Mic...")
         with c2:
-            if st.button("🎤 Mic", key="chat_mic"):
+            if st.button("🎤 Local", key="chat_mic_local", help="Fast local mic (requires PyAudio)"):
                 with st.spinner("Listening..."):
                     q = voice_utils.listen_local_mic(lang_code=stt_code)
                     if not q.startswith("Error"):
                         st.session_state.messages.append({"role": "user", "content": q})
-                        # Trigger AI response logic below by setting user_text
+                        st.session_state.voice_trigger = q
+                        st.rerun()
+                    else: st.error(q)
+        with c3:
+            # Native Streamlit Audio Input for Cloud users
+            cloud_audio = st.audio_input("Cloud Mic", key="chat_mic_cloud", label_visibility="collapsed")
+            if cloud_audio:
+                with st.spinner("Transcribing..."):
+                    q = voice_utils.process_audio_bytes(cloud_audio.getvalue(), lang_code=stt_code)
+                    if not q.startswith("Error"):
+                        st.session_state.messages.append({"role": "user", "content": q})
                         st.session_state.voice_trigger = q
                         st.rerun()
                     else: st.error(q)
@@ -165,66 +175,69 @@ elif mode == "🔧 Dynamic Troubleshooter":
 
 elif mode == "📹 Live Video / Scanner":
     st.header("📸 AI Video Scanner & Voice Sync")
-    st.info("Experience the future of electrical field work: Ask questions while scanning your hardware.")
+    st.info("Experience the future of electrical field work: Scan hardware or upload photos for AI expertise.")
     
-    # 1) Open Camera 📷
-    st.subheader("1. Open Camera")
-    camera_img = st.camera_input("Scanner Active", label_visibility="collapsed")
+    # -- Image Origin Selection --
+    v_tab1, v_tab2 = st.tabs(["📷 Live Camera", "📂 Upload Photo"])
     
-    # Show status or image
-    if camera_img:
-        st.image(camera_img, width=400, caption="Current View")
-        st.session_state.last_vision_img = camera_img
+    active_img = None
+    with v_tab1:
+        camera_img = st.camera_input("Scanner Active", label_visibility="collapsed")
+        if camera_img: active_img = camera_img
+    with v_tab2:
+        upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
+        if upload_img: active_img = upload_img
+    
+    # -- Unified AI Call Dashboard --
+    if active_img:
+        st.divider()
+        st.subheader("🤖 AI Diagnostic Dashboard")
+        st.image(active_img, width=500, caption="Analyzing this component")
+        st.session_state.last_vision_img = active_img
         
-        # 2) User Asks Question 🎤
-        st.subheader("2. Ask a Question")
-        v_col1, v_col2 = st.columns([1, 1])
+        # 2) User Asks Question Dashboard 🎤
+        v_col_mic, v_col_input = st.columns([2, 3])
         
-        with v_col1:
-            if st.button("🎤 Tap to Speak & Analyze", type="primary", use_container_width=True):
-                with st.spinner("Listening..."):
-                    q = voice_utils.listen_local_mic(lang_code=stt_code)
-                    if not q.startswith("Error"):
-                        st.session_state.v_q = q
-                        # 3) Voice -> Text (Captured in state)
-                        # 4) AI analyzes automatically
-                        with st.spinner("AI Analysis in Progress..."):
-                            b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
-                            resp = ai_engine.analyze_image(b64, q)
-                            st.session_state.v_resp = resp
+        with v_col_mic:
+            st.write("🎙️ VOICE INPUT")
+            vm_c1, vm_c2 = st.columns(2)
+            with vm_c1:
+                if st.button("🔌 Local", key="vision_mic_local", use_container_width=True, help="Requires PyAudio"):
+                    with st.spinner("Listening..."):
+                        q = voice_utils.listen_local_mic(lang_code=stt_code)
+                        if not q.startswith("Error"):
+                            st.session_state.v_q_input = q
                             st.rerun()
-                    else: st.error(q)
+                        else: st.error(q)
+            with vm_c2:
+                v_cloud_audio = st.audio_input("Cloud", key="vision_mic_cloud", label_visibility="collapsed")
+                if v_cloud_audio:
+                    with st.spinner("Transcribing..."):
+                        q = voice_utils.process_audio_bytes(v_cloud_audio.getvalue(), lang_code=stt_code)
+                        if not q.startswith("Error"):
+                            st.session_state.v_q_input = q
+                            st.rerun()
+                        else: st.error(q)
         
-        with v_col2:
-            manual_q = st.text_input("Or type question and hit Enter", key="manual_v_q")
-            if manual_q:
-                with st.spinner("Analyzing..."):
-                    b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
-                    resp = ai_engine.analyze_image(b64, manual_q)
+        with v_col_input:
+            manual_q = st.text_input("Technical Query", key="v_q_input", placeholder="e.g. Check for wire damage")
+            if st.button("🔍 START AI ANALYSIS", type="primary", use_container_width=True):
+                with st.spinner("Running Advanced Diagnostics..."):
+                    b64 = base64.b64encode(active_img.getvalue()).decode('utf-8')
+                    final_q = manual_q if manual_q else "Analyze this electrical component for any visible faults or safety risks."
+                    resp = ai_engine.analyze_image(b64, final_q)
                     st.session_state.v_resp = resp
+                    st.session_state.v_q_final = final_q
                     st.rerun()
 
-        # 5) Gives Answer 🔊 (Visual and Audio)
+        # 5) AI Results 🔊
         if "v_resp" in st.session_state:
-            st.markdown(f"**Question:** {st.session_state.get('v_q', 'Manual Query')}")
-            st.success("Analysis Complete!")
+            st.markdown("---")
+            st.markdown(f"**⚡ Analysis for:** *{st.session_state.get('v_q_final', 'Visual Scan')}*")
+            st.success("Expert Review Complete!")
             st.markdown(st.session_state.v_resp)
             js_audio = voice_utils.text_to_speech(st.session_state.v_resp, lang=tts_code)
             if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
-            # Remove response after showing or let it stay? Stay for user review.
-
-    st.markdown("---")
-    st.subheader("📂 Photo Upload")
-    upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
-    if upload_img:
-        st.image(upload_img, width=400)
-        if st.button("Analyze Uploaded Photo"):
-             with st.spinner("Processing..."):
-                b64 = base64.b64encode(upload_img.getvalue()).decode('utf-8')
-                resp = ai_engine.analyze_image(b64, "Describe health of this component and name it.")
-                st.markdown(resp)
-                js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
-                if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
 
 elif mode == "⚡ Load & Gauge Finder":
     st.header("Motor Load & Rewinding Spec Finder")
