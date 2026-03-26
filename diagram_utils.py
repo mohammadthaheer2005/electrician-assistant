@@ -71,4 +71,22 @@ def get_mermaid_diagram(circuit_type: str, lang: str = "English") -> str:
             end
         """
 
-    return "graph TD\\n  A[Select a Circuit Type] --> B[Generate Diagram]"
+    elif circuit_type == "Star-Delta Motor Starter":
+        return f"""
+        graph TD
+            MCCB["3-Ph Main MCCB"] --> MC["Main Contactor"]
+            MC --> OLR["Overload Relay"]
+            OLR --> Motor["3-Ph Motor (6 Terminals)"]
+            
+            subgraph Star_Delta_Group
+            SC["Star Contactor"] --- DC["Delta Contactor"]
+            end
+            
+            MC --- DC
+            DC --- Motor
+            SC --- Motor
+            
+            style SC fill:#aaf
+            style DC fill:#f96
+            style MC fill:#9f9
+        """

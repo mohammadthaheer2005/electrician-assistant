@@ -3,6 +3,34 @@ Knowledge Base for standard motor winding data.
 This acts as a lookup table/RAG augmentation for the AI.
 """
 
+# --- INDUSTRIAL FAULT DATA ---
+FAULT_SYMPTOMS = {
+    "motor_humming_no_rotation": {
+        "possible_faults": ["Faulty Capacitor", "Bearing Jam", "Single Phasing (if 3-ph)", "Winding Short"],
+        "solution": "1. Check capacitor with multimeter. 2. Verify all phases present. 3. Check for mechanical jam in fan/pump."
+    },
+    "motor_overheating": {
+        "possible_faults": ["Overload", "Low Voltage", "Poor Ventilation", "Bearing Friction"],
+        "solution": "1. Measure current (Amps) vs Nameplate. 2. Increase wire size if voltage drop is high. 3. Clean cooling fins."
+    },
+    "sparking_at_brushes": {
+        "possible_faults": ["Worn Carbon Brushes", "Dirty Commutator", "Overload"],
+        "solution": "1. Replace brushes if < 5mm. 2. Clean commutator with fine sandpaper. 3. Check load."
+    },
+    "circuit_breaker_tripping": {
+        "possible_faults": ["Short Circuit", "Earth Fault", "Overload", "Faulty Breaker"],
+        "solution": "1. Check insulation resistance (Megger). 2. Verify load hasn't increased. 3. Replace breaker if it trips without load."
+    }
+}
+
+# --- ELECTRICIAN'S ACADEMY (VIVA PREP) ---
+TECHNICAL_NOTES = {
+    "Star-Delta": "Star-Delta starting reduces the starting current to 1/3rd of the DOL current. Used for motors > 5HP to protect the grid and windings.",
+    "SWG (Standard Wire Gauge)": "A higher SWG number means a thinner wire. 18 SWG is thicker than 22 SWG.",
+    "Power Factor": "The ratio of Real Power (kW) to Apparent Power (kVA). Ideal is 1.0, typical industrial is 0.85.",
+    "Winding Basics": "Running winding (Main) has thicker wire and more turns to handle constant load. Starting winding (Aux) has thinner wire and is used for torque."
+}
+
 WINDING_DATA = {
     "fans": {
         "ceiling_fan_14_pole": {
