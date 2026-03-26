@@ -132,30 +132,51 @@ elif mode == "🔧 Dynamic Troubleshooter":
             st.markdown(resp)
 
 elif mode == "📹 Live Video / Scanner":
-    st.header("🔴 LIVE Video AI Assistant & Scanner")
-    st.info("Point your camera at the motor or board. Capture a snapshot to start a visual diagnostic 'Video Call' with the AI.")
+    st.header("🔴 Real-Time Video AI Assistant")
+    st.info("Point your camera and ask the AI about any electrical component. Highly interactive visual diagnostics.")
     
-    st.markdown("### 📸 Snapshot Capture")
-    col1, col2 = st.columns(2)
-    with col1:
-        camera_img = st.camera_input("Take Live Snapshot")
+    st.markdown("### 1. Enable Camera")
+    camera_img = st.camera_input("Capture Frame for AI Analysis")
     
-    with col2:
-        upload_img = st.file_uploader("Or Upload existing photo", type=["jpg", "png", "jpeg"])
+    if camera_img:
+        st.session_state.last_vision_img = camera_img
+        st.image(st.session_state.last_vision_img, width=400, caption="Current Snapshot")
         
-    active_img = camera_img if camera_img else upload_img
+    st.markdown("### 2. Voice/Text Question")
+    v_col1, v_col2 = st.columns([2, 1])
+    with v_col1:
+        vision_prompt = st.text_input("Ask me anything about the photo above...", placeholder="e.g. 'Is this wire gauge correct?'", key="v_prompt")
+    with v_col2:
+        v_audio = audio_recorder(text="Talk to AI", icon_size="2x", key="v_audio")
+        
+    if v_audio and len(v_audio) > 30000:
+        with st.spinner("Listening to your question..."):
+            recognized_q = voice_utils.process_audio_bytes(v_audio, lang_code=stt_code)
+            if recognized_q and not recognized_q.startswith("Error"):
+                st.session_state.v_query = recognized_q
+                st.info(f"You asked: {recognized_q}")
+            else:
+                st.error("Could not hear you. Try typing.")
+
+    # Process if we have an image and a query (either text or voice)
+    active_query = vision_prompt if vision_prompt else st.session_state.get("v_query")
     
-    if active_img:
-        st.image(active_img, width=400)
-        custom_prompt = st.text_input("What should the AI look for?", value="Extract Voltage, Power (HP/kW), Current (FLA/Amps), Phase, RPM, and Frame Size. Or identify any physical damage.")
-        if st.button("Analyze Image 🔍", use_container_width=True):
-            with st.spinner("Analyzing high-definition visual feed..."):
-                bytes_data = active_img.getvalue()
+    if active_query and st.session_state.get("last_vision_img"):
+        if st.button("Start AI Call Analysis ⚡", use_container_width=True):
+            with st.spinner("AI is analyzing the video frame..."):
+                bytes_data = st.session_state.last_vision_img.getvalue()
                 b64_image = base64.b64encode(bytes_data).decode('utf-8')
                 
-                response = ai_engine.analyze_image(b64_image, custom_prompt)
+                combined_prompt = f"Context: Video Analysis. User Question: {active_query}. Extract exact technical details."
+                response = ai_engine.analyze_image(b64_image, combined_prompt)
                 st.success("Analysis Complete!")
                 st.markdown(response)
+                
+                # Voice response
+                js_audio = voice_utils.text_to_speech(response, lang=tts_code)
+                if js_audio:
+                    html_audio = voice_utils.get_audio_html(js_audio)
+                    st.components.v1.html(html_audio, height=0)
 
 elif mode == "⚡ Load & Gauge Finder":
     st.header("Advanced Motor Load Analyzer & Gauge Finder")

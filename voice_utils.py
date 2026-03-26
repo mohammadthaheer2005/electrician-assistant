@@ -74,22 +74,26 @@ def process_audio_bytes(audio_bytes: bytes, hf_key: str = None, lang_code: str =
         max_retries = 3
         for i in range(max_retries):
             try:
-                # Use the official InferenceClient which handles headers and chunks better
+                # Use the official InferenceClient post method for full control over headers
                 hf_client = InferenceClient(api_key=active_key)
                 
-                # The correct method for Whisper on InferenceClient
-                result = hf_client.automatic_speech_recognition(
-                    audio_bytes,
-                    model="openai/whisper-large-v3-turbo"
+                # audio-recorder-streamlit sends webm or wav depending on browser
+                # audio/webm is widely supported by Whisper on HF
+                response_data = hf_client.post(
+                    data=audio_bytes,
+                    model="openai/whisper-large-v3-turbo",
+                    headers={"Content-Type": "audio/webm"}
                 )
                 
-                # automatic_speech_recognition returns a dict like {'text': '...'}
+                import json
+                result = json.loads(response_data.decode())
+                
                 if isinstance(result, dict) and "text" in result:
                     return result["text"]
                 elif isinstance(result, str):
                     return result
                 else:
-                    return f"Error: Unexpected response type {type(result)}"
+                    return f"Error: Unexpected response format {result}"
 
             except Exception as e:
                 # Catch 503 and retry
