@@ -7,3 +7,4 @@ pillow
 audio-recorder-streamlit
 huggingface_hub
 requests
+streamlit-webrtc

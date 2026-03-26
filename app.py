@@ -164,40 +164,64 @@ elif mode == "🔧 Dynamic Troubleshooter":
             st.markdown(ai_engine.chat_with_electrician([{"role":"user","content":p}], target_language=lang_choice))
 
 elif mode == "📹 Live Video / Scanner":
-    st.header("🔴 Real-Time Video AI Assistant")
-    st.info("You can now either capture a live frame OR upload an existing component photo for analysis.")
+    st.header("📸 AI Video Scanner & Voice Sync")
+    st.info("Experience the future of electrical field work: Ask questions while scanning your hardware.")
     
-    col_v1, col_v2 = st.columns(2)
-    with col_v1:
-        camera_img = st.camera_input("Capture Live Frame")
-    with col_v2:
-        upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
+    # 1) Open Camera 📷
+    st.subheader("1. Open Camera")
+    camera_img = st.camera_input("Scanner Active", label_visibility="collapsed")
     
-    active_img = camera_img if camera_img else upload_img
-    
-    if active_img:
-        st.image(active_img, width=400, caption="Analyzing this component...")
-        st.session_state.last_vision_img = active_img
+    # Show status or image
+    if camera_img:
+        st.image(camera_img, width=400, caption="Current View")
+        st.session_state.last_vision_img = camera_img
         
-        v_col1, v_col2 = st.columns([2, 1])
-        with v_col1: prompt = st.text_input("Ask about this photo...", key="v_p", placeholder="e.g. Read the RPM or check for damage")
-        with v_col2: 
-            if st.button("🎤 Local Mic (Pro)"):
+        # 2) User Asks Question 🎤
+        st.subheader("2. Ask a Question")
+        v_col1, v_col2 = st.columns([1, 1])
+        
+        with v_col1:
+            if st.button("🎤 Tap to Speak & Analyze", type="primary", use_container_width=True):
                 with st.spinner("Listening..."):
                     q = voice_utils.listen_local_mic(lang_code=stt_code)
                     if not q.startswith("Error"):
-                        st.session_state.v_p = q
-                        st.rerun()
+                        st.session_state.v_q = q
+                        # 3) Voice -> Text (Captured in state)
+                        # 4) AI analyzes automatically
+                        with st.spinner("AI Analysis in Progress..."):
+                            b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
+                            resp = ai_engine.analyze_image(b64, q)
+                            st.session_state.v_resp = resp
+                            st.rerun()
                     else: st.error(q)
         
-        # New "Analyze" Button as requested
-        if st.button("🔍 ANALYZE IMAGE", type="primary", use_container_width=True):
-            with st.spinner("Processing Visual Data..."):
-                b64 = base64.b64encode(st.session_state.last_vision_img.getvalue()).decode('utf-8')
-                # Use prompt if provided, else default to 'What is this?'
-                final_q = st.session_state.v_p if st.session_state.v_p else "Analyze this electrical component in detail."
-                resp = ai_engine.analyze_image(b64, final_q)
-                st.success("Analysis Complete!")
+        with v_col2:
+            manual_q = st.text_input("Or type question and hit Enter", key="manual_v_q")
+            if manual_q:
+                with st.spinner("Analyzing..."):
+                    b64 = base64.b64encode(camera_img.getvalue()).decode('utf-8')
+                    resp = ai_engine.analyze_image(b64, manual_q)
+                    st.session_state.v_resp = resp
+                    st.rerun()
+
+        # 5) Gives Answer 🔊 (Visual and Audio)
+        if "v_resp" in st.session_state:
+            st.markdown(f"**Question:** {st.session_state.get('v_q', 'Manual Query')}")
+            st.success("Analysis Complete!")
+            st.markdown(st.session_state.v_resp)
+            js_audio = voice_utils.text_to_speech(st.session_state.v_resp, lang=tts_code)
+            if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
+            # Remove response after showing or let it stay? Stay for user review.
+
+    st.markdown("---")
+    st.subheader("📂 Photo Upload")
+    upload_img = st.file_uploader("Upload Component Photo", type=["jpg", "png", "jpeg"])
+    if upload_img:
+        st.image(upload_img, width=400)
+        if st.button("Analyze Uploaded Photo"):
+             with st.spinner("Processing..."):
+                b64 = base64.b64encode(upload_img.getvalue()).decode('utf-8')
+                resp = ai_engine.analyze_image(b64, "Describe health of this component and name it.")
                 st.markdown(resp)
                 js_audio = voice_utils.text_to_speech(resp, lang=tts_code)
                 if js_audio: st.components.v1.html(voice_utils.get_audio_html(js_audio), height=0)
